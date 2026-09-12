@@ -39,7 +39,8 @@ npm run dev
 - [x] Fase 7: API de contenido y cuentas
 - [x] **Fase 8: Media Processor real (9:16 TikTok)** — OK ✅ (_2026-09-12_)
 - [x] **Fase 9: Instagram OAuth real (Graph API + long-lived)** — OK ✅ (_2026-09-12_)
-- [ ] Fase 10: Publicación a Instagram (pendiente)
+- [x] **Fase 10: Publishing real IG (publish_queue + polling)** — OK ✅ (_2026-09-12_)
+- [ ] Fase 11: Historial y analytics (pendiente)
 
 ## Docs
 

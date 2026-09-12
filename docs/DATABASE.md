@@ -113,6 +113,29 @@ Almacén central de tokens de Instagram OAuth (long-lived ~60 días). Los tokens
 - Índices: `idx_provider_tokens_user_provider` (user_id, provider) y `idx_provider_tokens_expiry` (expires_at) para el job cron.
 - El job cron de refresh marca tokens con `expires_at <= now + 5 días` y los re-intercambia.
 
+### `publish_queue` (Fase 10)
+Cola de publicación de Instagram (REELS 9:16). Publica media_items que ya están `READY` (Fase 8) vía Graph API.
+
+| Columna             | Tipo        | Notas                               |
+|---------------------|-------------|-------------------------------------|
+| id                  | uuid (PK)   |                                     |
+| user_id             | uuid (FK)   | Dueño (RLS)                         |
+| social_account_id   | uuid (FK)   | Cuenta IG conectada (Fase 9)        |
+| media_id            | uuid (FK)   | media_item READY (Fase 8)           |
+| caption             | text        | Máx. 2200 chars + trim              |
+| video_url           | text        | Signed URL del bucket `processed`   |
+| status              | text        | PENDING / SCHEDULED / PUBLISHING / PUBLISHED / FAILED |
+| scheduled_at        | timestamptz | Si hay schedule, se publica cuando <= now() |
+| attempts            | integer     | Reintentos (retry 3 si ERROR)       |
+| ig_media_id         | text        | media_id real de Meta (o mock_*)    |
+| error               | text        | Mensaje de error                |
+| created_at          | timestamptz |                                     |
+| updated_at          | timestamptz | Auto-actualizado                    |
+
+- Índices: `idx_publish_queue_user_status` (user_id, status) y `idx_publish_queue_due` (status, scheduled_at) para el cron.
+- Sin token real → fallback MOCK que marca `PUBLISHED` con `ig_media_id mock_*`.
+- URL del video siempre firmada del bucket `processed` (nunca `raw`).
+
 ### `publications`
 Publicaciones programadas o completadas.
 
