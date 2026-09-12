@@ -38,7 +38,8 @@ npm run dev
 - [x] Fase 6: Detección de fuentes + dedup
 - [x] Fase 7: API de contenido y cuentas
 - [x] **Fase 8: Media Processor real (9:16 TikTok)** — OK ✅ (_2026-09-12_)
-- [ ] Fase 9: OAuth Instagram (pendiente)
+- [x] **Fase 9: Instagram OAuth real (Graph API + long-lived)** — OK ✅ (_2026-09-12_)
+- [ ] Fase 10: Publicación a Instagram (pendiente)
 
 ## Docs
 
