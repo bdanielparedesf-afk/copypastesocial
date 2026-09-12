@@ -34,10 +34,11 @@ npm run dev
 ## Roadmap
 
 - [x] Fase 1: Auditoría + Design System
-- [ ] Fase 2: Selección de contenido
-- [ ] Fase 3: Descarga y transcodificación
-- [ ] Fase 4: Publicación en destinos
-- [ ] Fase 5: Historial y analytics
+- [x] Fase 4: Publicación en destinos
+- [x] Fase 6: Detección de fuentes + dedup
+- [x] Fase 7: API de contenido y cuentas
+- [x] **Fase 8: Media Processor real (9:16 TikTok)** — OK ✅ (_2026-09-12_)
+- [ ] Fase 9: OAuth Instagram (pendiente)
 
 ## Docs
 
