@@ -11,7 +11,9 @@
  * Retry: FAILED → PENDING vía retryFailed (attempts suman hasta 3 en processPost).
  */
 import { createServerClient } from '@/lib/supabase';
+import { processJob } from './publication.service';
 import { errorFactory } from '@/utils/errors';
+import { checkCanPublish } from '@/lib/accounts';
 import {
   getAccessToken,
   getSignedProcessedUrl,
@@ -54,9 +56,22 @@ export const CONTAINER_POLL_MAX_TICKS = 24;
 
 /**
  * Encola un post (PENDING si no hay scheduled_at, SCHEDULED si lo hay).
+ * FASE 11: verifica checkCanPublish (límite diario 25 + token válido +
+ * no expira <=5 días); si falla → AppError 429 LIMIT_EXCEEDED.
  */
 export async function enqueuePost(options: EnqueuePostOptions): Promise<QueueItem> {
   const admin = createServerClient();
+
+  // FASE 11 — límite diario + token válido + expiración
+  const canPublish = await checkCanPublish(options.socialAccountId);
+  if (!canPublish) {
+    throw errorFactory({
+      provider: null,
+      status: 429,
+      message: 'FASE 11 LIMIT_EXCEEDED: límite diario de 25 publicaciones alcanzado o token a expirar (reconecta la cuenta)',
+      code: 'RATE_LIMITED',
+    });
+  }
 
   const { data, error } = await admin
     .from('publish_queue')
@@ -303,4 +318,56 @@ export async function processPost(queueId: string): Promise<QueueItem> {
 
     throw err;
   }
+}
+
+/**
+ * FASE 18 — Procesa todos los publication_jobs en PENDING.
+ *
+ * Estados segun migration base (minúsculas):
+ *   pending -> running -> completed | failed
+ *
+ * processJob() (publication.service.ts) ya marca PROCESSING antes de
+ * ejecutar y SUCCESS/FAILED al finalizar, por lo que este trigger solo
+ * necesita disparar la cola.
+ *
+ * Devuelve la cantidad de jobs encontrados en PENDING (0 si no hay).
+ */
+export async function processQueue(): Promise<number> {
+  const admin = createServerClient();
+  const now = new Date().toISOString();
+
+  // FASE 19: Auto-retry — cambiar jobs RETRYING con next_attempt <= now() a PENDING
+  const { error: retryUpdateError } = await admin
+    .from('publication_jobs')
+    .update({ status: 'pending' })
+    .eq('status', 'retrying')
+    .not('next_attempt', 'is', null)
+    .lte('next_attempt', now);
+
+  if (retryUpdateError) throw retryUpdateError;
+
+  // FASE 18: Buscar jobs PENDING (incluye los recién promovidos de RETRYING)
+  // FASE 20: Rate limit — máx 100 jobs por ejecución cron
+  const { data: pendingData, error: pendingError } = await admin
+    .from('publication_jobs')
+    .select('id')
+    .eq('status', 'pending')
+    .limit(100);
+
+  if (pendingError) throw pendingError;
+
+  const allJobs = pendingData ?? [];
+
+  let processed = 0;
+  for (const job of allJobs) {
+    try {
+      await processJob(job.id);
+      processed += 1;
+    } catch {
+      // Independencia plataformas: si un job falla, los demás continúan.
+      // processJob ya marca el job como FAILED internamente.
+    }
+  }
+
+  return processed;
 }

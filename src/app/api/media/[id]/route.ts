@@ -82,3 +82,110 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   return NextResponse.json({ mediaItem });
 }
+
+/* ------------------------------------------------------------------ */
+/* FASE 17 — PATCH /api/media/[id]                                    */
+/*                                                                    */
+/* Actualiza los campos de IA de un media_item:                        */
+/*   ai_generated_caption, ai_generated_title, ai_generated_hashtags   */
+/*                                                                    */
+/* Ownership: media_items -> sources.user_id (igual que GET).          */
+/* ------------------------------------------------------------------ */
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'id debe ser un UUID válido' }, { status: 400 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Body JSON inválido' }, { status: 400 });
+  }
+
+  const update: Record<string, unknown> = {};
+
+  const bg = body as Record<string, unknown>;
+
+  if (Object.prototype.hasOwnProperty.call(bg, 'ai_generated_caption')) {
+    const val = bg.ai_generated_caption;
+    if (val !== null && typeof val !== 'string') {
+      return NextResponse.json(
+        { error: 'ai_generated_caption debe ser texto o null' },
+        { status: 400 }
+      );
+    }
+    update.ai_generated_caption = val;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(bg, 'ai_generated_title')) {
+    const val = bg.ai_generated_title;
+    if (val !== null && typeof val !== 'string') {
+      return NextResponse.json(
+        { error: 'ai_generated_title debe ser texto o null' },
+        { status: 400 }
+      );
+    }
+    update.ai_generated_title = val;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(bg, 'ai_generated_hashtags')) {
+    const val = bg.ai_generated_hashtags;
+    if (val !== null && !Array.isArray(val)) {
+      return NextResponse.json(
+        { error: 'ai_generated_hashtags debe ser un array o null' },
+        { status: 400 }
+      );
+    }
+    update.ai_generated_hashtags = val;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json(
+      { error: 'No se proporcionaron campos para actualizar' },
+      { status: 400 }
+    );
+  }
+
+  const { data: item, error } = await supabase
+    .from('media_items')
+    .update(update)
+    .eq('id', id)
+    .select('id, sources!inner(user_id)')
+    .single();
+
+  if (error || !item) {
+    return NextResponse.json(
+      { error: 'media_item no encontrado o sin permisos' },
+      { status: 404 }
+    );
+  }
+
+  const sources = item?.sources as unknown;
+  const sourceOwner = Array.isArray(sources)
+    ? (sources[0] as { user_id?: string } | undefined)?.user_id
+    : (sources as { user_id?: string } | undefined)?.user_id;
+
+  if (sourceOwner !== user.id) {
+    return NextResponse.json(
+      { error: 'media_item no encontrado o sin permisos' },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ success: true, id });
+}

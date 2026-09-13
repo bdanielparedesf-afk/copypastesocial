@@ -1,7 +1,7 @@
-import { InstagramProvider } from './instagram';
-import { YoutubeProvider } from './youtube';
-import { FacebookProvider } from './facebook';
-import { TikTokProvider } from './tiktok';
+import { InstagramProvider } from './instagram/index';
+import { YoutubeProvider } from './youtube/index';
+import { FacebookProvider } from './facebook/index';
+import { TikTokProvider } from './tiktok/index';
 import type { BaseProvider } from './index';
 
 export const providers: BaseProvider[] = [

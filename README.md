@@ -1,4 +1,4 @@
-# CopyPasteSocial
+# Content Copier
 
 **Importa. Selecciona. Publica.**
 
@@ -6,22 +6,23 @@ Importa contenido de redes sociales (Instagram, YouTube, Facebook, TikTok), elig
 
 ## Stack
 
-Next.js 14 (App Router) + TypeScript + Supabase + Tailwind CSS + shadcn/ui + Framer Motion + Lucide React + FFmpeg
+Next.js 15, Supabase, Framer Motion, Design #0A0A0B
 
-## Estructura
+## Rutas
 
-```
-src/
-├── app/              # Next.js App Router
-├── providers/        # Proveedores de redes sociales
-├── services/         # Servicios de negocio
-├── workers/          # Workers asíncronos (download, transcode, publish)
-├── types/            # Tipos compartidos
-├── utils/            # Utilidades
-├── config/           # Configuración centralizada
-├── components/ui/    # shadcn/ui primitives
-└── lib/supabase/     # Supabase client
-```
+21 rutas API + cron
+
+## Cron
+
+03:05 UTC = 00:05 Santiago
+
+## Quota YT
+
+6 videos/día → retrying automático
+
+## Upload local
+
+1000 videos sin storage, directo a jobs
 
 ## Getting Started
 
@@ -30,17 +31,6 @@ npm install
 cp .env.example .env
 npm run dev
 ```
-
-## Roadmap
-
-- [x] Fase 1: Auditoría + Design System
-- [x] Fase 4: Publicación en destinos
-- [x] Fase 6: Detección de fuentes + dedup
-- [x] Fase 7: API de contenido y cuentas
-- [x] **Fase 8: Media Processor real (9:16 TikTok)** — OK ✅ (_2026-09-12_)
-- [x] **Fase 9: Instagram OAuth real (Graph API + long-lived)** — OK ✅ (_2026-09-12_)
-- [x] **Fase 10: Publishing real IG (publish_queue + polling)** — OK ✅ (_2026-09-12_)
-- [ ] Fase 11: Historial y analytics (pendiente)
 
 ## Docs
 

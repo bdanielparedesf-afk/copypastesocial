@@ -1,11 +1,5 @@
-/**
- * FASE 9 — GET/POST /api/auth/instagram
- *
- * Inicia el flujo OAuth real de Instagram (Facebook Login). Devuelve la URL
- * del diálogo con state y los scopes de IG (instagram_basic +
- * instagram_content_publish + pages_show_list + business_management).
- */
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabase';
 import { getAuthUrl } from '@/lib/providers/instagram/auth';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +11,12 @@ function buildState(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const origin = request.nextUrl?.origin ?? DEFAULT_ORIGIN;
 
   const state = buildState('instagram');

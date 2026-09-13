@@ -131,7 +131,7 @@ export async function processMediaItem(mediaItemId: string): Promise<ProcessResu
     }
 
     // Marcar en proceso
-    await db.from('media_items').update({ status: 'PROCESSING' }).eq('id', mediaItemId);
+    await db.from('media_items').update({ status: 'processing' }).eq('id', mediaItemId);
 
     // 2) Descargar el raw: bucket 'raw' de Storage o source_url/url vía HTTP
     const rawRef = extractStoragePath(item.raw_url);

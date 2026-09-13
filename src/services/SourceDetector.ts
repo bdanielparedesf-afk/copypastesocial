@@ -76,16 +76,16 @@ const PATTERNS: PatternConfig[] = [
   {
     provider: 'facebook',
     hostname: /^(?:www\.|m\.)?facebook\.com$/i,
+    regex: /^\/share\/([^/?#]+)\/?$/i,
+    contentType: 'post',
+    extractIdentifier: (_, match) => cleanIdentifier(match[1]),
+  },
+  {
+    provider: 'facebook',
+    hostname: /^(?:www\.|m\.)?facebook\.com$/i,
     regex: /^\/watch\/?$/i,
     contentType: 'video',
     extractIdentifier: (url) => cleanIdentifier(url.searchParams.get('v')),
-  },
-    {
-    provider: 'facebook',
-    hostname: /^(?:www\.|m\.)?facebook\.com$/i,
-    regex: /^\/share\/v\/([^/?#]+)\/?$/i,
-    contentType: 'post',
-    extractIdentifier: (_, match) => cleanIdentifier(match[1]),
   },
   {
     provider: 'facebook',
@@ -100,6 +100,20 @@ const PATTERNS: PatternConfig[] = [
     regex: /^\/@[^/]+\/video\/([^/?#]+)\/?$/i,
     contentType: 'video',
     extractIdentifier: (_, match) => cleanIdentifier(match[1]),
+  },
+  {
+    provider: 'tiktok',
+    hostname: /^vm\.tiktok\.com$/i,
+    regex: /^\/([^/?#]+)\/?$/i,
+    contentType: 'video',
+    extractIdentifier: (url) => cleanIdentifier(url.pathname.split('/')[1]),
+  },
+  {
+    provider: 'tiktok',
+    hostname: /^vt\.tiktok\.com$/i,
+    regex: /^\/([^/?#]+)\/?$/i,
+    contentType: 'video',
+    extractIdentifier: (url) => cleanIdentifier(url.pathname.split('/')[1]),
   },
 ];
 

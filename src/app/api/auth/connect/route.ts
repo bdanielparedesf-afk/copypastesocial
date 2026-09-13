@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabase';
 import { config } from '@/config';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,12 @@ function clientIdFor(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   let provider: string | null = null;
 
   if (request.method === 'POST') {
@@ -62,7 +69,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const body = (await request.json()) as { provider?: string };
       provider = body.provider ?? null;
     } catch {
-      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+      return NextResponse.json({ error: 'JSON invalido' }, { status: 400 });
     }
   } else {
     provider = request.nextUrl.searchParams.get('provider');

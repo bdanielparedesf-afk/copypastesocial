@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 import { tokenService } from '@/services/TokenService';
 import type { SocialAccount } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { id } = await params;
 
   const { data, error } = await supabase
@@ -33,7 +39,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     await tokenService.revoke(account);
   } catch {
-    // Si el revoke remoto falla, igualmente marcamos la cuenta como inválida
     await supabase
       .from('social_accounts')
       .update({ is_valid: false, updated_at: new Date().toISOString() })

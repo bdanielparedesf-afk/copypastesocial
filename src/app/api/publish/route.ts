@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
 
   // 1) Auth + body
   const { data: { user } } = await admin.auth.getUser();
-  const userId = user?.id ?? '00000000-0000-0000-0000-000000000000';
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = user.id;
 
   let body: unknown;
   try {

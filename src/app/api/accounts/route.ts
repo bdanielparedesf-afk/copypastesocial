@@ -1,21 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { tokenService } from '@/services/TokenService';
+import { createServerClient } from '@/lib/supabase';
+import {
+  listAccounts,
+  disconnectAccount,
+  type AccountWithToken,
+} from '@/lib/accounts';
 
 export const dynamic = 'force-dynamic';
 
+async function currentUserId(): Promise<string | null> {
+  const admin = createServerClient();
+  const { data: { user } } = await admin.auth.getUser();
+  return user?.id ?? null;
+}
+
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from('social_accounts')
-      .select('id, provider, username, is_valid, expires_at, created_at')
-      .order('created_at', { ascending: false });
+    const userId = await currentUserId();
+    if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // FASE 11: listAccounts con provider_tokens.is_valid + expires_at + límites
+    const accounts = await listAccounts(userId);
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const payload: Array<AccountWithToken & { used_today?: number }> = [];
+
+    for (const account of accounts) {
+      const { data: limits } = await createServerClient()
+        .from('publish_queue')
+        .select('id')
+        .eq('social_account_id', account.id)
+        .eq('status', 'PUBLISHED')
+        .gte('created_at', new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString());
+
+      payload.push({ ...account, used_today: limits?.length ?? 0 });
     }
 
-    return NextResponse.json({ success: true, accounts: data ?? [] });
+    return NextResponse.json({ success: true, accounts: payload });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
@@ -24,42 +43,25 @@ export async function GET() {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
-    const body = await req.json();
-    const { provider, username, accessToken, refreshToken, expiresAt, scopes } = body;
+    const userId = await currentUserId();
+    if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const accountId = request.nextUrl.searchParams.get('account_id');
 
-    if (!provider || !username || !accessToken) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!accountId) {
+      return NextResponse.json(
+        { success: false, error: 'account_id es requerido' },
+        { status: 400 }
+      );
     }
 
-    const encryptedAccess = tokenService.encrypt(accessToken);
-    const encryptedRefresh = refreshToken ? tokenService.encrypt(refreshToken) : null;
+    await disconnectAccount(accountId, userId);
 
-    const { data, error } = await supabase
-      .from('social_accounts')
-      .upsert({
-        user_id: crypto.randomUUID(),
-        provider,
-        username,
-        access_token: encryptedAccess,
-        refresh_token: encryptedRefresh,
-        expires_at: expiresAt ?? null,
-        scopes: scopes ?? [],
-        is_valid: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,provider,username' })
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ account: data });
+    return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

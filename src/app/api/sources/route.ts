@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 
 export async function GET() {
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { data, error } = await supabase
       .from('sources')
@@ -21,4 +27,3 @@ export async function GET() {
     );
   }
 }
-

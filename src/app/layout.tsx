@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'CopyPasteSocial — Importa. Selecciona. Publica.',
@@ -14,7 +15,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <Toaster position="top-right" />
+      </body>
     </html>
   );
 }

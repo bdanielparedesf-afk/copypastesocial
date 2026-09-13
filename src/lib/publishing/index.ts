@@ -21,12 +21,26 @@ export {
 } from './publisher';
 
 export {
+  createPublication,
+  processJob,
+} from './publication.service';
+
+export {
+  assertCanPublish,
+} from './rate-limit.service';
+
+export {
+  isDuplicate,
+} from './idempotency';
+
+export {
   enqueuePost,
   getQueue,
   getDueItems,
   cancelScheduled,
   retryFailed,
   processPost,
+  processQueue,
   MAX_PUBLISH_ATTEMPTS,
   CONTAINER_POLL_INTERVAL_MS,
   CONTAINER_POLL_MAX_TICKS,

@@ -1,0 +1,6 @@
+{
+  "crons": [{
+    "path": "/api/cron/processQueue",
+    "schedule": "5 3 * * *"
+  }]
+}
