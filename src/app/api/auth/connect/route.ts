@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
+import { redirectUriFor } from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,11 +152,21 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const origin = resolveOrigin(request);
   const state = Buffer.from(JSON.stringify({ provider })).toString('base64url');
 
+  // URL canónica del redirect_uri por provider (lee @/lib/oauth).
+  // Meta (FB+IG) usa una sola URI: /api/auth/callback/facebook ; el resto usa
+  // /api/auth/<provider>/callback. Esto debe coincidir EXACTO con lo registrado
+  // en cada consola del provider para evitar "El dominio de esta URL no está
+  // incluido en los dominios de la app" en Facebook.
+  const redirectUri = redirectUriFor(
+    provider as 'facebook' | 'instagram' | 'tiktok' | 'youtube',
+    origin
+  );
+
   // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
   const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
   const params = new URLSearchParams({
     client_id: clientIdFor(provider),
-    redirect_uri: `${origin}/api/auth/${provider}/callback`,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: auth.scopes.join(scopeSep),
     state,

@@ -3,25 +3,19 @@ import { createServerClient } from '@/lib/supabase';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 import { tokenService } from '@/services/TokenService';
+import {
+  canonicalOrigin,
+  redirectUriFor,
+  parseOAuthState,
+} from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
 
-function resolveOrigin(request: NextRequest): string {
-  const fromRequest = request.nextUrl?.origin;
-  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
-  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
-  if (env) return env;
-  return process.env.NODE_ENV === 'production'
-    ? 'https://copypastesocial.vercel.app'
-    : 'http://localhost:3000';
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  // El callback del provider NO puede exigir sesión previa.
   const userId = await getUserIdAllowDev(request);
 
-  const origin = resolveOrigin(request);
-  const redirectUri = `${origin}/api/auth/youtube/callback`;
+  const origin = canonicalOrigin(request.nextUrl?.origin);
+  const redirectUri = redirectUriFor('youtube', origin);
 
   const code = request.nextUrl.searchParams.get('code');
   const state = request.nextUrl.searchParams.get('state');
@@ -39,15 +33,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(accountsUrl);
   }
 
-  if (state) {
-    try {
-      const parsed = JSON.parse(Buffer.from(state, 'base64url').toString()) as { provider?: string };
-      if (parsed.provider && parsed.provider !== 'youtube') {
-        accountsUrl.searchParams.set('error', 'state_mismatch');
-        return NextResponse.redirect(accountsUrl);
-      }
-    } catch {
-    }
+  if (parseOAuthState(state) && parseOAuthState(state) !== 'youtube') {
+    accountsUrl.searchParams.set('error', 'state_mismatch');
+    return NextResponse.redirect(accountsUrl);
   }
 
   try {
@@ -62,30 +50,51 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         grant_type: 'authorization_code',
       }),
     });
-    const tokenData = await tokenRes.json().catch(() => ({}));
+
+    const tokenData = await tokenRes.json().catch(() => ({})) as {
+      access_token?: string;
+      expires_in?: number;
+      refresh_token?: string;
+    };
 
     if (!tokenRes.ok || !tokenData.access_token) {
-      throw new Error('Error intercambiando el code de Google');
+      const raw =
+        typeof tokenData === 'string'
+          ? tokenData
+          : tokenData?.error_message ??
+            tokenData?.error_description ??
+            undefined;
+      throw new Error(raw ?? 'Error intercambiando el code de Google');
     }
 
     const accessToken = tokenData.access_token as string;
-    const expiresAt = tokenData.expires_in
-      ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString()
+    const expiresAt =
+      tokenData.expires_in != null
+        ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString()
+        : null;
+    const refreshToken = tokenData.refresh_token
+      ? (tokenData.refresh_token as string)
       : null;
-    const refreshToken = tokenData.refresh_token ? (tokenData.refresh_token as string) : null;
 
     let username = 'Canal de YouTube';
-    const channelRes = await fetch(`${config.providers.youtube.baseUrl}/channels?part=snippet&mine=true`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const channelRes = await fetch(
+      `${config.providers.youtube.baseUrl}/channels?part=snippet&mine=true`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
     if (channelRes.ok) {
-      const channelData = await channelRes.json().catch(() => ({}));
+      const channelData = (await channelRes.json().catch(() => ({}))) as {
+        items?: { snippet?: { title?: string } }[];
+      };
       const channel = channelData.items?.[0];
       if (channel?.snippet?.title) username = channel.snippet.title;
     }
 
     const encryptedAccess = tokenService.encrypt(accessToken);
-    const encryptedRefresh = refreshToken ? tokenService.encrypt(refreshToken) : null;
+    const encryptedRefresh = refreshToken
+      ? tokenService.encrypt(refreshToken)
+      : null;
 
     const admin = createServerClient();
     const ownerId = userId;
@@ -109,9 +118,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       updated_at: new Date().toISOString(),
     };
 
-    const { error: dbError } = existing?.id
-      ? await admin.from('social_accounts').update(record).eq('id', existing.id)
-      : await admin.from('social_accounts').insert(record);
+    const { error: dbError } =
+      existing?.id
+        ? await admin
+            .from('social_accounts')
+            .update(record)
+            .eq('id', existing.id)
+        : await admin.from('social_accounts').insert(record);
 
     if (dbError) throw new Error(dbError.message);
 

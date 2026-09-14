@@ -2,22 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
+import { buildOAuthState, canonicalOrigin, redirectUriFor } from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
-
-function resolveOrigin(request: NextRequest): string {
-  const fromRequest = request.nextUrl?.origin;
-  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
-  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
-  if (env) return env;
-  return process.env.NODE_ENV === 'production'
-    ? 'https://copypastesocial.vercel.app'
-    : 'http://localhost:3000';
-}
-
-function buildState(provider: string): string {
-  return Buffer.from(JSON.stringify({ provider, ts: Date.now() })).toString('base64url');
-}
 
 async function handle(request: NextRequest): Promise<NextResponse> {
   // Single-owner: nunca 401 aquí (la app no tiene login propio).
@@ -50,10 +37,10 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const origin = resolveOrigin(request);
+  const origin = canonicalOrigin(request.nextUrl?.origin);
 
-  const state = buildState('youtube');
-  const redirectUri = `${origin}/api/auth/youtube/callback`;
+  const state = buildOAuthState('youtube');
+  const redirectUri = redirectUriFor('youtube', origin);
 
   const params = new URLSearchParams({
     client_id: clientId,

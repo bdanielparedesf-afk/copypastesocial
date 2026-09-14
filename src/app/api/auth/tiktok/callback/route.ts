@@ -3,34 +3,36 @@ import { createServerClient } from '@/lib/supabase';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 import { tokenService } from '@/services/TokenService';
+import {
+  canonicalOrigin,
+  redirectUriFor,
+  parseOAuthState,
+} from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
-
-function resolveOrigin(request: NextRequest): string {
-  const fromRequest = request.nextUrl?.origin;
-  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
-  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
-  if (env) return env;
-  return process.env.NODE_ENV === 'production'
-    ? 'https://copypastesocial.vercel.app'
-    : 'http://localhost:3000';
-}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // El callback del provider NO puede exigir sesión previa.
   const userId = await getUserIdAllowDev(request);
 
-  const origin = resolveOrigin(request);
-  const redirectUri = `${origin}/api/auth/tiktok/callback`;
+  const origin = canonicalOrigin(request.nextUrl?.origin);
+  const redirectUri = redirectUriFor('tiktok', origin);
 
   const code = request.nextUrl.searchParams.get('code');
   const state = request.nextUrl.searchParams.get('state');
-  const errorParam = request.nextUrl.searchParams.get('error');
+  const errorParam =
+    request.nextUrl.searchParams.get('error') ??
+    request.nextUrl.searchParams.get('error_code');
+  const errorMsg =
+    request.nextUrl.searchParams.get('error_description') ??
+    request.nextUrl.searchParams.get('error_msg');
 
   const accountsUrl = new URL('/accounts', origin);
-
   if (errorParam) {
-    accountsUrl.searchParams.set('error', errorParam);
+    accountsUrl.searchParams.set(
+      'error',
+      errorMsg ? `${errorParam}: ${errorMsg}` : errorParam
+    );
     return NextResponse.redirect(accountsUrl);
   }
 
@@ -39,15 +41,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(accountsUrl);
   }
 
-  if (state) {
-    try {
-      const parsed = JSON.parse(Buffer.from(state, 'base64url').toString()) as { provider?: string };
-      if (parsed.provider && parsed.provider !== 'tiktok') {
-        accountsUrl.searchParams.set('error', 'state_mismatch');
-        return NextResponse.redirect(accountsUrl);
-      }
-    } catch {
-    }
+  if (parseOAuthState(state) && parseOAuthState(state) !== 'tiktok') {
+    accountsUrl.searchParams.set('error', 'state_mismatch');
+    return NextResponse.redirect(accountsUrl);
   }
 
   try {
@@ -62,25 +58,37 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         redirect_uri: redirectUri,
       }),
     });
-    const tokenBody = await tokenRes.json().catch(() => ({}));
-    const data = tokenBody.data ?? tokenBody;
+    const tokenBody = await tokenRes.json().catch(() => ({})) as Record<string, unknown>;
+    const data = (tokenBody.data as Record<string, unknown> | undefined) ?? tokenBody;
 
     if (!tokenRes.ok || !data.access_token) {
-      throw new Error('Error intercambiando el code de TikTok');
+      const errMsg =
+        (tokenBody.error_response as Record<string, unknown>)?.msg ??
+        (tokenBody.msg as string | undefined) ??
+        (typeof data === 'string' ? data : undefined) ??
+        'Error intercambiando el code de TikTok';
+      throw new Error(errMsg);
     }
 
-    const accessToken = data.access_token as string;
-    const expiresAt = data.expires_in
-      ? new Date(Date.now() + Number(data.expires_in) * 1000).toISOString()
+    const accessToken = tokenBody.access_token as string;
+    const expiresAt = tokenBody.expires_in
+      ? new Date(Date.now() + Number(tokenBody.expires_in) * 1000).toISOString()
       : null;
-    const refreshToken = data.refresh_token ? (data.refresh_token as string) : null;
+    const refreshToken = tokenBody.refresh_token
+      ? (tokenBody.refresh_token as string)
+      : null;
 
-    let username = data.open_id ?? 'TikTok';
-    const userRes = await fetch(`${config.providers.tiktok.baseUrl}/user/info/?fields=open_id,display_name,avatar_url`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    let username = (data.open_id as string | undefined) ?? 'TikTok';
+    const userRes = await fetch(
+      `${config.providers.tiktok.baseUrl}/user/info/?fields=open_id,display_name,avatar_url`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
     if (userRes.ok) {
-      const userData = await userRes.json().catch(() => ({}));
+      const userData = (await userRes.json().catch(() => ({}))) as {
+        data?: { user?: { display_name?: string } };
+      };
       const user = userData.data?.user;
       if (user?.display_name) username = user.display_name;
     }
@@ -89,17 +97,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const encryptedRefresh = refreshToken ? tokenService.encrypt(refreshToken) : null;
 
     const admin = createServerClient();
-    const ownerId = userId;
     const { data: existing } = await admin
       .from('social_accounts')
       .select('id')
-      .eq('user_id', ownerId)
+      .eq('user_id', userId)
       .eq('provider', 'tiktok')
       .eq('username', username)
       .maybeSingle();
 
     const record = {
-      user_id: ownerId,
+      user_id: userId,
       provider: 'tiktok',
       username,
       access_token: encryptedAccess,

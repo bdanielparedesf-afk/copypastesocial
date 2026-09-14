@@ -8,7 +8,89 @@ export const YOUTUBE_SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
 ].join(' ');
 
-/** Origen canónico según entorno (request origin > NEXT_PUBLIC_APP_URL > default por env). */
+// ---------------------------------------------------------------------------
+// Origen canónico (request origin > NEXT_PUBLIC_APP_URL > default por env)
+// ---------------------------------------------------------------------------
+
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/$/, '');
+}
+
+/**
+ * Origen canónico: origin del request > NEXT_PUBLIC_APP_URL > default por env.
+ * Regla: el redirect_uri se construye SIEMPRE desde el origin del request en
+ * runtime (request.nextUrl.origin). Así local (cualquier puerto) y Vercel usan
+ * la URI que el provider redirige, sin desfasajes con NEXT_PUBLIC_APP_URL.
+ */
+export function canonicalOrigin(requestOrigin?: string | null): string {
+  if (requestOrigin && /^https?:\/\//i.test(requestOrigin)) {
+    return stripTrailingSlash(requestOrigin.trim());
+  }
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim();
+  if (env) return stripTrailingSlash(env);
+  return process.env.NODE_ENV === 'production'
+    ? 'https://copypastesocial.vercel.app'
+    : 'http://localhost:3000';
+}
+
+// ---------------------------------------------------------------------------
+// redirect_uri canónico por provider
+// ---------------------------------------------------------------------------
+
+/**
+ * redirect_uri canónico por provider (mismo path en init y en callback).
+ * - Meta (FB+IG) usa UNA sola URI: /api/auth/callback/facebook (el state distingue).
+ * - YouTube: /api/auth/youtube/callback
+ * - TikTok:  /api/auth/tiktok/callback
+ *
+ * URIs a registrar en cada consola (añade AMBAS, local + prod):
+ *   - Facebook/Instagram (Meta Developers → Facebook Login → "URI de redirección de OAuth válidos"):
+ *       http://localhost:3000/api/auth/callback/facebook
+ *       https://copypastesocial.vercel.app/api/auth/callback/facebook
+ *   - YouTube (Google Cloud Console → Credenciales → OAuth Client Web → redirect_uris):
+ *       http://localhost:3000/api/auth/youtube/callback
+ *       https://copypastesocial.vercel.app/api/auth/youtube/callback
+ *   - TikTok (TikTok Developers → tu app → Login Kit → Redirect URI):
+ *       http://localhost:3000/api/auth/tiktok/callback
+ *       https://copypastesocial.vercel.app/api/auth/tiktok/callback
+ */
+export function redirectUriFor(
+  provider: 'facebook' | 'instagram' | 'tiktok' | 'youtube',
+  requestOrigin?: string | null
+): string {
+  const origin = canonicalOrigin(requestOrigin);
+  if (provider === 'facebook' || provider === 'instagram') {
+    return `${origin}/api/auth/callback/facebook`;
+  }
+  return `${origin}/api/auth/${provider}/callback`;
+}
+
+// ---------------------------------------------------------------------------
+// State OAuth (base64url con provider + timestamp)
+// ---------------------------------------------------------------------------
+
+/** State OAuth (base64url con provider + timestamp). */
+export function buildOAuthState(provider: string): string {
+  return Buffer.from(JSON.stringify({ provider, ts: Date.now() })).toString('base64url');
+}
+
+/** Lee el provider del state; null si no parseable. */
+export function parseOAuthState(state: string | null): string | null {
+  if (!state) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString()) as {
+      provider?: string;
+    };
+    return parsed.provider ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Origen canónico según entorno (request origin > NEXT_PUBLIC_APP_URL > default
+ * por env). Conservado para compatibilidad con código existente que lo llame.
+ */
 export function appOrigin(requestOrigin?: string | null): string {
   if (requestOrigin) return requestOrigin;
   const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
