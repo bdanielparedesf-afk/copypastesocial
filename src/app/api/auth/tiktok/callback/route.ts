@@ -65,8 +65,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const errMsg =
         (tokenBody.error_response as Record<string, unknown>)?.msg ??
         (tokenBody.msg as string | undefined) ??
-        (typeof data === 'string' ? data : undefined) ??
-        'Error intercambiando el code de TikTok';
+        ((typeof data === 'string' ? data : (data as any)?.error_description || (data as any)?.message || JSON.stringify(data)) ||
+          'Error intercambiando el code de TikTok');
       throw new Error(errMsg);
     }
 
