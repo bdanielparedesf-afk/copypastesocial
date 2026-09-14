@@ -82,33 +82,19 @@ function isoFromExpiresIn(expiresIn: number | string | undefined): string | null
 
 /**
  * 1) URL del Facebook Login para conectar una cuenta de Instagram.
- *    Scopes App 1231742610032848 (Graph v19.0, Instagram Business API):
- *    instagram_business_basic + instagram_business_content_publish +
- *    manage_comments/messages/insights + pages_* (para descubrir la IG Business).
+ *    Business Login con config_id (Graph v20.0).
+ *    Los scopes de Instagram Business ya vienen incluidos en el config_id
+ *    1432189552393923 configurado en Meta Developer Dashboard.
+ *    NO añadir scope=instagram_business_* a la URL — causaba "Invalid Scopes".
  */
 export function getAuthUrl(options: AuthUrlOptions): string {
-  const cfg = config.providers.instagram;
-  const scopes = [
-    'public_profile',
-    'pages_show_list',
-    'pages_read_engagement',
-    'instagram_business_basic',
-    'instagram_business_content_publish',
-    'instagram_business_manage_comments',
-    'instagram_business_manage_messages',
-    'instagram_business_manage_insights',
-    ...(options.extraScopes ?? []),
-  ];
+  const APP_ID = '1231742610032848';
+  const CONFIG_ID = '1432189552393923';
+  const REDIRECT_URI = options.redirectUri;
 
-  const params = new URLSearchParams({
-    client_id: cfg.appId ?? '',
-    redirect_uri: options.redirectUri,
-    response_type: 'code',
-    scope: scopes.join(','),
-  });
-  if (options.state) params.set('state', options.state);
+  const url = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${APP_ID}&config_id=${CONFIG_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code${options.state ? '&state=' + options.state : ''}`;
 
-  return `https://www.facebook.com/${cfg.graphApiVersion}/dialog/oauth?${params.toString()}`;
+  return url;
 }
 
 /**

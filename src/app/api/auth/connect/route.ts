@@ -18,42 +18,29 @@ function resolveOrigin(request: NextRequest): string {
 interface ProviderAuthUrl {
   url: string;
   scopes: string[];
+  appId?: string;
+  configId?: string;
 }
 
 function buildAuthUrl(provider: string): ProviderAuthUrl | null {
+  const metaBase = 'https://www.facebook.com/v20.0/dialog/oauth';
+  const APP_ID = '1231742610032848';
+  const CONFIG_ID = '1432189552393923';
+
   switch (provider) {
     case 'instagram':
+    case 'facebook': {
+      // Business Login con config_id (Graph v20.0).
+      // Los scopes de Instagram Business ya vienen incluidos en el config_id
+      // 1432189552393923 configurado en Meta Developer Dashboard.
+      // NO añadir scope=instagram_business_* — causaba "Invalid Scopes".
       return {
-        url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
-        scopes: [
-          'public_profile',
-          'pages_show_list',
-          'pages_read_engagement',
-          'instagram_business_basic',
-          'instagram_business_content_publish',
-          'instagram_business_manage_comments',
-          'instagram_business_manage_messages',
-          'instagram_business_manage_insights',
-        ],
+        url: metaBase,
+        scopes: [], // vacío: los permisos vienen del config_id
+        appId: APP_ID,
+        configId: CONFIG_ID,
       };
-    case 'facebook':
-      return {
-        url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
-        // NOTA: 'publish_video' NO existe en Meta → causaba error de OAuth.
-        // App 1231742610032848 (Graph v19.0): Pages + Instagram Business.
-        scopes: [
-          'public_profile',
-          'pages_show_list',
-          'pages_read_engagement',
-          'pages_manage_posts',
-          'pages_manage_engagement',
-          'instagram_business_basic',
-          'instagram_business_content_publish',
-          'instagram_business_manage_comments',
-          'instagram_business_manage_messages',
-          'instagram_business_manage_insights',
-        ],
-      };
+    }
     case 'youtube':
       return {
         url: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -108,11 +95,6 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Provider requerido' }, { status: 400 });
   }
 
-  const auth = buildAuthUrl(provider);
-  if (!auth) {
-    return NextResponse.json({ error: 'Provider no soportado' }, { status: 400 });
-  }
-
   if (provider === 'youtube') {
     const clientId = (clientIdFor(provider) ?? '').trim();
     const clientSecret = (config.providers.youtube.clientSecret ?? '').trim();
@@ -162,22 +144,36 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     origin
   );
 
-  // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
-  const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
-  const params = new URLSearchParams({
-    client_id: clientIdFor(provider),
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: auth.scopes.join(scopeSep),
-    state,
-  });
-
-  if (provider === 'youtube') {
-    params.set('access_type', 'offline');
-    params.set('prompt', 'consent');
+  // Construcción de la URL de auth por provider.
+  const auth = buildAuthUrl(provider);
+  if (!auth) {
+    return NextResponse.json({ error: 'Provider no soportado' }, { status: 400 });
   }
 
-  return NextResponse.json({ url: `${auth.url}?${params.toString()}` });
+  let authUrl: string;
+  if (provider === 'facebook' || provider === 'instagram') {
+    // Business Login con config_id (Graph v20.0).
+    const { appId, configId } = auth as { appId: string; configId: string };
+    authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
+  } else {
+    // YouTube / TikTok: construir con scopes tradicionales.
+    // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
+    const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
+    const params = new URLSearchParams({
+      client_id: clientIdFor(provider),
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: auth.scopes.join(scopeSep),
+      state,
+    });
+    if (provider === 'youtube') {
+      params.set('access_type', 'offline');
+      params.set('prompt', 'consent');
+    }
+    authUrl = `${auth.url}?${params.toString()}`;
+  }
+
+  return NextResponse.json({ url: authUrl });
 }
 
 export { handle as GET, handle as POST };
