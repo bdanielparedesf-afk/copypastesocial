@@ -61,8 +61,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const raw =
         typeof tokenData === 'string'
           ? tokenData
-          : tokenData?.error_message ??
-            tokenData?.error_description ??
+          : (tokenData as any).error_message ??
+            (tokenData as any).error_description ??
             undefined;
       throw new Error(raw ?? 'Error intercambiando el code de Google');
     }
