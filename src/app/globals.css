@@ -100,4 +100,39 @@
     color: #DC2626;
     background: rgba(220, 38, 38, 0.15);
   }
+
+  /* Layout futurista: aurora, rejilla, borde neon */
+  .app-shell {
+    background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.12), transparent 55%),
+      hsl(var(--background));
+    min-height: 100vh;
+  }
+
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    animation: aurora-float 16s ease-in-out infinite alternate;
+  }
+
+  .grid-futuristic {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.6) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.6) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at 50% 20%, black 30%, transparent 80%);
+  }
+
+  .neon-border {
+    box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.35), 0 0 44px -12px rgba(124, 58, 237, 0.55);
+  }
+}
+
+@keyframes aurora-float {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(60px, 40px, 0) scale(1.12);
+  }
 }

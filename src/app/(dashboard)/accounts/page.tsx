@@ -1,362 +1,443 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * Cuentas y Redes — Conecta Instagram, Facebook, TikTok y YouTube.
+ *
+ * - 4 tarjetas de red: estado, CTA "Iniciar sesion" y desconexion.
+ * - Lista de cuentas reales conectadas via /api/accounts.
+ * - Diseno futurista: aurora local, vidrio, bordes neon, animaciones.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
-  AlertTriangle,
+  AtSign,
+  BadgeCheck,
   CheckCircle2,
+  Facebook,
+  HardDriveUpload,
   Instagram,
   Link2,
   Loader2,
+  Music2,
+  RefreshCw,
+  ShieldCheck,
   Trash2,
-  XCircle,
+  TriangleAlert,
+  Unplug,
   Youtube,
+  Zap,
 } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@/components/ui';
+import { Button } from '@/components/ui';
+import UploadModal from '@/components/upload/upload-modal';
 import { cn } from '@/utils';
+
+type ProviderId = 'instagram' | 'facebook' | 'tiktok' | 'youtube';
 
 interface SocialAccount {
   id: string;
   provider: string;
   username: string;
+  profile_image?: string | null;
   is_valid: boolean;
-  expires_at: string | null;
-  created_at: string;
   token_is_valid: boolean;
+  expires_at: string | null;
   expiring_in_days: number | null;
-  used_today?: number;
+  created_at: string;
 }
 
-const PROVIDERS = [
+const PROVIDERS: Array<{
+  id: ProviderId;
+  label: string;
+  tagline: string;
+  connectLabel: string;
+  glow: string;
+  chip: string;
+  bar: string;
+  Icon: typeof Instagram;
+  init: () => Promise<Response>;
+}> = [
   {
     id: 'instagram',
     label: 'Instagram',
-    color: 'bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737]',
-    icon: 'IG',
+    tagline: 'Reels y fotos desde tu PC o por URL',
+    connectLabel: 'Iniciar sesion con Instagram',
+    glow: 'hover:shadow-[0_0_36px_-8px_rgba(225,48,108,0.65)]',
+    chip: 'bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737]',
+    bar: 'from-[#833AB4] via-[#E1306C] to-[#F77737]',
+    Icon: Instagram,
+    init: () => fetch('/api/auth/instagram'),
   },
-  { id: 'facebook', label: 'Facebook', color: 'bg-blue-600', icon: 'FB' },
-  { id: 'youtube', label: 'YouTube', color: 'bg-gradient-to-r from-[#FF0000] to-[#CC0000]', icon: 'YT' },
-  { id: 'tiktok', label: 'TikTok', color: 'bg-black', icon: 'TT' },
+  {
+    id: 'facebook',
+    label: 'Facebook',
+    tagline: 'Publica videos en tu pagina o perfil',
+    connectLabel: 'Iniciar sesion con Facebook',
+    glow: 'hover:shadow-[0_0_36px_-8px_rgba(24,119,242,0.7)]',
+    chip: 'bg-[#1877F2]',
+    bar: 'from-[#1877F2] to-[#06B6D4]',
+    Icon: Facebook,
+    init: () => fetch('/api/auth/facebook'),
+  },
+  {
+    id: 'tiktok',
+    label: 'TikTok',
+    tagline: 'Sube clips verticales en un clic',
+    connectLabel: 'Iniciar sesion con TikTok',
+    glow: 'hover:shadow-[0_0_36px_-8px_rgba(37,244,238,0.5)]',
+    chip: 'bg-gradient-to-br from-[#25F4EE] via-neutral-200 to-[#FE2C55]',
+    bar: 'from-[#25F4EE] to-[#FE2C55]',
+    Icon: Music2,
+    init: () => fetch('/api/auth/tiktok'),
+  },
+  {
+    id: 'youtube',
+    label: 'YouTube',
+    tagline: 'Shorts y videos largos automaticos',
+    connectLabel: 'Iniciar sesion con YouTube',
+    glow: 'hover:shadow-[0_0_36px_-8px_rgba(255,0,0,0.6)]',
+    chip: 'bg-[#FF0000]',
+    bar: 'from-[#FF0000] to-[#F77737]',
+    Icon: Youtube,
+    init: () => fetch('/api/auth/youtube'),
+  },
 ];
 
-const DAILY_LIMIT = 25;
-
-function getProviderInfo(providerId: string) {
-  return (
-    PROVIDERS.find((p) => p.id === providerId) ?? {
-      id: providerId,
-      label: providerId,
-      color: 'bg-gray-500',
-      icon: 'LK',
-    }
-  );
-}
-
-function ExpiresBadge({ account }: { account: SocialAccount }) {
-  if (!account.expires_at) return null;
-  const soon = account.expiring_in_days !== null && account.expiring_in_days <= 5;
-
-  if (soon) {
-    return (
-      <Badge
-        status="UNAVAILABLE"
-        variant="status"
-        className="border-red-500 bg-red-500/10 text-red-500"
-      >
-        <AlertTriangle size={12} />
-        <span className="ml-1">Expira en {account.expiring_in_days}d</span>
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge status="ACCESSIBLE" variant="status" className="text-muted-foreground">
-      Expira {new Date(account.expires_at).toLocaleDateString()}
-    </Badge>
-  );
-}
+const STEP_LABELS = ['Conecta tus redes', 'Sube tus videos', 'Publica en 1 clic'];
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [revoking, setRevoking] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState<string | null>(null);
-  const [switching, setSwitching] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [connecting, setConnecting] = useState<ProviderId | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
-  async function fetchAccounts() {
-    setLoading(true);
+  const fetchAccounts = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/accounts');
-      const body = (await res.json()) as { accounts?: SocialAccount[]; error?: string };
-      if (body.error) {
-        setError(body.error);
-      } else {
-        setAccounts(body.accounts ?? []);
-      }
+      const res = await fetch('/api/accounts', { cache: 'no-store' });
+      const body = (await res.json()) as {
+        accounts?: SocialAccount[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(body.error ?? `Error ${res.status}`);
+      setAccounts(Array.isArray(body.accounts) ? body.accounts : []);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al cargar cuentas';
       setError(msg);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }
-
-  const handleSwitch = async (accountId: string) => {
-    setSwitching(accountId);
-    try {
-      const res = await fetch('/api/accounts/switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account_id: accountId }),
-      });
-      const body = (await res.json()) as { success?: boolean; error?: string };
-      if (body.success) { setError(null); }
-      else { setError(body.error ?? 'Error al cambiar de cuenta'); }
-    } catch {
-      setError('Error al cambiar de cuenta');
-    } finally {
-      setSwitching(null);
-    }
-  };
-
-  const handleDisconnect = async (accountId: string) => {
-    setRevoking(accountId);
-    try {
-      const res = await fetch(`/api/accounts?account_id=${encodeURIComponent(accountId)}`, { method: 'DELETE' });
-      if (res.ok) { await fetchAccounts(); }
-      else {
-        const data = await res.json().catch(() => ({}));
-        setError((data as { error?: string }).error ?? 'Error al desconectar cuenta');
-      }
-    } catch {
-      setError('Error al desconectar cuenta');
-    } finally {
-      setRevoking(null);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchAccounts();
   }, []);
 
-  /* FASE 11: Connect Instagram */
-  const handleConnectInstagram = async () => {
-    setConnecting('instagram');
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  // Vuelta de OAuth (?connected= / ?error=) -> refrescar + aviso
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const oauthError = params.get('error');
+    if (connected) {
+      toast.success(`${connected} conectado correctamente`);
+      fetchAccounts(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (oauthError) {
+      toast.error(`No se pudo conectar: ${oauthError}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [fetchAccounts]);
+
+  const connectedSet = useMemo(
+    () => new Set(accounts.filter((a) => a.is_valid !== false).map((a) => a.provider)),
+    [accounts]
+  );
+
+  const handleConnect = useCallback(async (providerId: ProviderId) => {
+    if (connecting) return;
+    setConnecting(providerId);
     try {
-      const res = await fetch('/api/auth/instagram');
+      const provider = PROVIDERS.find((p) => p.id === providerId);
+      if (!provider) return;
+      const res = await provider.init();
       const body = (await res.json()) as { url?: string; error?: string };
-      if (body.url) {
-        window.location.href = body.url;
-      } else if (body.error) {
-        setError(body.error);
-        setConnecting(null);
+      if (!res.ok || !body.url) {
+        throw new Error(body.error ?? `No se pudo iniciar OAuth (${res.status})`);
       }
-    } catch {
-      setError('Error al iniciar la conexión de Instagram');
+      window.location.href = body.url;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al conectar';
+      toast.error(msg);
       setConnecting(null);
     }
-  };
+  }, [connecting]);
 
-  /* FASE 12: Connect YouTube */
-  const handleConnectYouTube = async () => {
-    setConnecting('youtube');
+  const handleDisconnect = useCallback(async (accountId: string) => {
+    setDisconnecting(accountId);
     try {
-      const res = await fetch('/api/auth/youtube');
-      const body = (await res.json()) as { url?: string; error?: string };
-      if (body.url) {
-        window.location.href = body.url;
-      } else if (body.error) {
-        setError(body.error);
-        setConnecting(null);
-      }
-    } catch {
-      setError('Error al iniciar la conexión de YouTube');
-      setConnecting(null);
+      const res = await fetch(`/api/accounts/${accountId}`, { method: 'DELETE' });
+      const body = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || !body.success) throw new Error(body.error ?? 'No se pudo desconectar');
+      toast.success('Cuenta desconectada');
+      setAccounts((prev) => prev.filter((a) => a.id !== accountId));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al desconectar');
+    } finally {
+      setDisconnecting(null);
     }
-  };
-
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/50 backdrop-blur sticky top-0 z-50">
-        <div className="flex h-14 items-center px-6">
-          <Link2 className="mr-2 h-5 w-5 text-primary" />
-          <span className="font-semibold text-lg">Cuentas Conectadas</span>
-          <span className="ml-auto text-xs text-muted-foreground">FASE 11</span>
+    <main className="relative mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-brand-cyan">
+            Paso 1 de 3 - Cuentas
+          </p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">
+            Conecta tus <span className="text-gradient">4 redes sociales</span>
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Inicia sesion en cada red una sola vez. Despues sube videos desde tu PC
+            y publicalos en todas a la vez.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
+            <Zap size={12} className="text-brand-cyan" />
+            {connectedSet.size}/4 conectadas
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAccounts(true)}
+            disabled={refreshing || loading}
+          >
+            {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            Recargar
+          </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mb-6 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+
+      <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {STEP_LABELS.map((label, i) => (
+          <li
+            key={label}
+            className={cn(
+              'flex items-center gap-3 rounded-xl border px-4 py-3 text-sm',
+              i === 0
+                ? 'border-brand-purple/50 bg-brand-purple/10 text-white shadow-glow-purple'
+                : 'border-white/5 bg-white/[0.02] text-muted-foreground'
+            )}
+          >
+            <span
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold',
+                i === 0
+                  ? 'bg-gradient-to-br from-brand-purple to-brand-cyan text-white'
+                  : 'bg-muted text-muted-foreground'
+              )}
             >
-              <XCircle size={16} />
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {accounts.length > 0 && (
-          <Card className="mb-8 border-border/50">
-            <CardContent className="flex flex-wrap items-center gap-6 p-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Cuentas activas:</span>
-                <span className="text-sm text-muted-foreground">
-                  {accounts.filter((a) => a.is_valid && a.token_is_valid).length} / {accounts.length}
+              {i + 1}
+            </span>
+            {label}
+          </li>
+        ))}
+      </ol>
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => fetchAccounts()}
+            className="ml-auto shrink-0 font-medium underline hover:no-underline"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      <section
+        aria-label="Redes sociales disponibles"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {PROVIDERS.map((provider, idx) => {
+          const connected = connectedSet.has(provider.id);
+          const list = accounts.filter((a) => a.provider === provider.id);
+          const busy = connecting === provider.id;
+          const { Icon } = provider;
+          return (
+            <motion.article
+              key={provider.id}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.07, duration: 0.45 }}
+              className={cn(
+                'glass group relative flex flex-col overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1',
+                provider.glow,
+                connected ? 'neon-border' : 'hover:border-white/20'
+              )}
+            >
+              <div
+                aria-hidden
+                className={cn('absolute inset-x-0 top-0 h-1 bg-gradient-to-r', provider.bar)}
+              />
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg',
+                    provider.chip
+                  )}
+                >
+                  <Icon size={24} />
                 </span>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-white">{provider.label}</h2>
+                  <p className="truncate text-xs text-muted-foreground">{provider.tagline}</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-        <Card>
-          <CardContent>
-            <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-medium">Límite diario:</span>
-                <span className="text-sm text-muted-foreground">25 publicaciones/día</span>
+
+              <div className="mt-4 flex items-center gap-2">
+                {loading ? (
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 size={13} className="animate-spin" /> Verificando...
+                  </span>
+                ) : connected ? (
+                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+                    <BadgeCheck size={13} /> Conectado{list.length > 1 ? ` (${list.length})` : ''}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                    <Unplug size={13} /> Sin conectar
+                  </span>
+                )}
+                {list.some((a) => a.expiring_in_days !== null && a.expiring_in_days <= 5) && (
+                  <span className="text-[11px] text-amber-400">Token por vencer</span>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 flex-shrink-0 animate-pulse rounded-full bg-muted" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                      <div className="h-3 w-32 animate-pulse rounded bg-muted" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+              <div className="mt-4 flex-1 space-y-2">
+                <AnimatePresence initial={false}>
+                  {list.map((account) => (
+                    <motion.div
+                      key={account.id}
+                      layout
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] px-2.5 py-2"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-purple to-brand-cyan text-[10px] font-bold text-white">
+                        {account.username.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-foreground">
+                        <AtSign size={11} className="shrink-0 text-muted-foreground" />
+                        <span className="truncate">{account.username}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDisconnect(account.id)}
+                        disabled={disconnecting === account.id}
+                        aria-label={`Desconectar ${account.username}`}
+                        title="Desconectar"
+                        className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
+                      >
+                        {disconnecting === account.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} />
+                        )}
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {!loading && list.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-border px-3 py-2 text-center text-[11px] text-muted-foreground">
+                    Aun no hay cuentas de {provider.label} aqui
+                  </p>
+                )}
+              </div>
+
+              <Button
+                variant={connected ? 'outline' : 'glow'}
+                className="mt-4 w-full"
+                onClick={() => handleConnect(provider.id)}
+                disabled={!!connecting || loading}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Abriendo {provider.label}...
+                  </>
+                ) : connected ? (
+                  <>
+                    <Link2 size={15} /> Conectar otra cuenta
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={15} /> {provider.connectLabel}
+                  </>
+                )}
+              </Button>
+            </motion.article>
+          );
+        })}
+      </section>
+
+      <section className="glass neon-border relative overflow-hidden rounded-2xl p-6 sm:p-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at 85% 15%, rgba(6,182,212,0.22), transparent 55%), radial-gradient(circle at 10% 90%, rgba(124,58,237,0.25), transparent 55%)',
+          }}
+        />
+        <div className="relative flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-purple to-brand-cyan shadow-glow-purple">
+              <HardDriveUpload size={24} className="text-white" />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-white sm:text-xl">
+                Ya conectaste {connectedSet.size} de 4 —{' '}
+                <span className="text-gradient">sube tus videos ahora</span>
+              </h2>
+              <p className="mt-1 max-w-lg text-sm text-muted-foreground">
+                Elige MP4, WEBM o MOV desde tu PC. Se encolan solos para Instagram,
+                YouTube, Facebook y TikTok.
+              </p>
+            </div>
           </div>
-        ) : accounts.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <Instagram className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">No hay cuentas conectadas</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Conecta tu primera cuenta para comenzar a publicar.</p>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleConnectInstagram} disabled={!!connecting}>
-                  {connecting === 'instagram' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando...</> : <><Instagram className="mr-2 h-4 w-4" />Connect Instagram</>}
-                </Button>
-                <Button onClick={handleConnectYouTube} disabled={!!connecting} variant="destructive" className="gap-2">
-                  {connecting === 'youtube' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando...</> : <><Youtube className="h-4 w-4" />Conectar YouTube</>}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {accounts.map((account) => {
-              const provider = getProviderInfo(account.provider);
-              const usedToday = account.used_today ?? 0;
-              const remaining = DAILY_LIMIT - usedToday;
-              const isExpiring = account.expiring_in_days !== null && account.expiring_in_days <= 5;
-              const isValid = account.is_valid && account.token_is_valid;
-              return (
-                <Card key={account.id} className={cn('border-border/50 transition-all hover:border-primary/30', !isValid && 'opacity-60')}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-md', provider.color)}>
-                          {provider.icon}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={cn('truncate font-semibold', !isValid && 'text-muted-foreground line-through')}>{account.username}</span>
-                            {isExpiring && <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{provider.label}</span>
-                            <span>·</span>
-                            <span>{new Date(account.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <ExpiresBadge account={account} />
-                        <Badge variant={isValid ? 'default' : 'destructive'} className={cn('text-xs', !isValid && 'bg-destructive/20 text-destructive')}>
-                          {isValid ? 'Activo' : 'Desconectado'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="mt-4 border-t border-border/50 pt-4">
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Publicaciones hoy</span>
-                        <span className="font-medium">{usedToday} / {DAILY_LIMIT}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div className={cn('h-full rounded-full transition-all duration-300', remaining === 0 ? 'bg-destructive' : remaining <= 5 ? 'bg-amber-500' : 'bg-primary')} style={{ width: `${Math.min(100, (usedToday / DAILY_LIMIT) * 100)}%` }} />
-                      </div>
-                      {remaining === 0 && <p className="mt-2 text-xs text-red-500">Límite diario alcanzado.</p>}
-                      {remaining <= 5 && remaining > 0 && <p className="mt-2 text-xs text-amber-500">Quedan {remaining} publicación(es) hoy.</p>}
-                    </div>
-                    {isExpiring && (
-                      <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                          <div>
-                            <span className="font-medium">Token a expirar</span>
-                            <p className="mt-0.5">Tu token expira en {account.expiring_in_days} días. <button onClick={() => handleConnectYouTube()} className="font-medium underline hover:no-underline">Reconecta ahora</button> para renovar.</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="mt-4 flex items-center gap-2">
-                      {isValid ? (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => handleSwitch(account.id)} disabled={!!switching}>
-                            {switching === account.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Link2 className="mr-2 h-3.5 w-3.5" />Establecer como activa</>}
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDisconnect(account.id)} disabled={!!revoking}>
-                            {revoking === account.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Trash2 className="mr-2 h-3.5 w-3.5" />Desconectar</>}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button size="sm" onClick={() => handleConnectYouTube()} disabled={!!connecting} className="w-full">
-                          {connecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Instagram className="mr-2 h-4 w-4" />Reconectar Instagram</>}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-        <div className="mt-8 flex justify-center gap-2">
-          <Button size="lg" className="gap-2 shadow-lg shadow-primary/20" onClick={handleConnectInstagram} disabled={!!connecting}>
-            <Instagram className="h-5 w-5" />
-            {connecting ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : 'Connect Instagram'}
-          </Button>
-          <Button size="lg" variant="destructive" className="gap-2 shadow-lg shadow-primary/20" onClick={handleConnectYouTube} disabled={!!connecting}>
-            <Youtube className="h-5 w-5" />
-            {connecting ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : 'Conectar YouTube'}
+          <Button
+            variant="glow"
+            size="xl"
+            onClick={() => setUploadOpen(true)}
+            className="shrink-0"
+          >
+            <HardDriveUpload size={18} />
+            Subir videos de mi PC
           </Button>
         </div>
-        <footer className="mt-12 flex flex-col items-center gap-2 border-t border-border/50 pt-8 text-xs text-muted-foreground">
-          <p>FASE 11+12 — Multi-cuenta con límites</p>
-          <ul className="flex flex-wrap items-center gap-4">
-            <li>• Máx. 25 publicaciones/día por cuenta</li>
-            <li>• Máx. 200 llamadas API/hora</li>
-            <li>• Tokens con &lt;5 días: warning reconnect</li>
-          </ul>
-        </footer>
-      </main>
-    </div>
+      </section>
+
+      {connectedSet.size > 0 && (
+        <p className="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <CheckCircle2 size={15} className="text-emerald-400" />
+          Todo listo para publicar: ve a <span className="font-semibold text-foreground">Mi contenido</span> y
+          lanza tus videos a las redes conectadas.
+        </p>
+      )}
+
+      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} onUploaded={() => fetchAccounts(true)} />
+    </main>
   );
 }
+

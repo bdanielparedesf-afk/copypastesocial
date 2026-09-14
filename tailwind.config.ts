@@ -69,6 +69,10 @@ const config: Config = {
         'gradient-brand': 'linear-gradient(135deg, #7C3AED 0%, #06B6D4 100%)',
         'gradient-glow': 'radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.25), transparent 60%)',
       },
+      boxShadow: {
+        'glow-purple': '0 0 24px -6px rgba(124, 58, 237, 0.55)',
+        'glow-cyan': '0 0 24px -6px rgba(6, 182, 212, 0.5)',
+      },
       keyframes: {
         'fade-in': {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
