@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { uploadFilesDirect } from '@/lib/upload/direct-upload';
 import { cn } from '@/utils';
 
 const MAX_FILES = 50;
@@ -106,47 +107,23 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
     setError(null);
     setResult(null);
 
-    const fd = new FormData();
-    files.forEach((f) => fd.append('files', f));
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/media/upload-local');
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
-      }
-    };
-    xhr.onload = () => {
-      setUploading(false);
-      if (xhr.status === 401) {
-        setError('Sesion no iniciada. Recarga la pagina e inicia sesion para poder subir videos.');
-        return;
-      }
-      try {
-        const body = JSON.parse(xhr.responseText) as {
-          success?: boolean;
-          imported?: number;
-          jobsCreated?: number;
-          error?: string;
-        };
-        if (xhr.status >= 200 && xhr.status < 300 && body.success) {
-          const imported = body.imported ?? files.length;
-          setProgress(100);
-          setResult({ imported, jobs: body.jobsCreated ?? 0 });
-          toast.success(`${imported} video(s) listos para publicar en tus redes`);
-          onUploaded?.(imported);
-        } else {
-          setError(body.error ?? 'No se pudieron subir los archivos');
-        }
-      } catch {
-        setError('Respuesta invalida del servidor');
-      }
-    };
-    xhr.onerror = () => {
-      setUploading(false);
-      setError('Error de conexion al subir archivos');
-    };
-    xhr.send(fd);
+    // FASE 21 — Subida directa navegador → Supabase Storage (URLs firmadas).
+    // El binario NO pasa por la API route: así Vercel no responde 413
+    // (FUNCTION_PAYLOAD_TOO_LARGE, body máximo de 4.5MB).
+    uploadFilesDirect(files, { onProgress: (p) => setProgress(p), createJobs: true })
+      .then((res) => {
+        const imported = res.imported || files.length;
+        setUploading(false);
+        setProgress(100);
+        setResult({ imported, jobs: res.jobsCreated });
+        toast.success(`${imported} video(s) listos para publicar en tus redes`);
+        onUploaded?.(imported);
+      })
+      .catch((e: unknown) => {
+        setUploading(false);
+        setProgress(0);
+        setError(e instanceof Error ? e.message : 'No se pudieron subir los archivos');
+      });
   }, [files, uploading, onUploaded]);
 
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);

@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { processMediaItem } from '@/lib/media/processor';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -20,14 +21,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // 1) Auth
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
+  // 1) Auth — single-owner: nunca 401 (la app no tiene login propio).
+  const userId = await getUserIdAllowDev(request);
 
   // 2) Body + validación UUID
   let body: unknown;
@@ -61,7 +56,7 @@ export async function POST(request: Request) {
     ? (sources[0] as { user_id?: string } | undefined)?.user_id
     : (sources as { user_id?: string } | undefined)?.user_id;
 
-  if (ownedError || !owned || sourceOwner !== user.id) {
+  if (ownedError || !owned || sourceOwner !== userId) {
     return NextResponse.json(
       { error: 'media_item no encontrado o sin permisos' },
       { status: 404 }

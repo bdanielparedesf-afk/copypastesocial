@@ -1,31 +1,31 @@
 /**
- * FASE 18 — POST /api/media/upload
+ * FASE 18 — POST /api/media/upload [DEPRECADO — FASE 21]
  * Subida de archivos locales (sin Supabase Storage).
  *
- * Recibe multipart/form-data con uno o más archivos.
- * - Crea un source con provider='local'
- * - Crea media_items con source_provider='local' y la URL como data: URL
- * - NO usa supabase.storage (todo en memoria/BD)
+ * DEPRECADO: responde 413 a propósito ('use direct upload'). Usar
+ * POST /api/media/upload-url -> PUT directo a Storage -> POST /api/media/finalize-upload.
  *
- * Body: FormData con campo 'files' (uno o más File)
+ * Body legacy: FormData con campo 'files' (uno o más File)
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST() {
+  // FASE 21 — Ruta vieja deshabilitada a propósito ('use direct upload').
+  return NextResponse.json(
+    {
+      error: 'use direct upload',
+      message:
+        'Esta ruta ya no acepta archivos. Usa POST /api/media/upload-url -> PUT directo a Storage -> POST /api/media/finalize-upload.',
+    },
+    { status: 413 }
+  );
+  /*
   try {
-    const supabase = await createClient();
-
-    // Verificar autenticación
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
-    }
+    // Single-owner: nunca 401 (la app no tiene login propio).
+    const userId = await getUserIdAllowDev(request);
+    const supabase = createServerClient();
 
     // Parsear FormData
     const formData = await request.formData();
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     const { data: source, error: sourceError } = await supabase
       .from('sources')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         original_url: `local://${validFiles[0].name}`,
         provider: 'local',
         identifier: `local_${Date.now()}`,
@@ -146,4 +146,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  */
 }

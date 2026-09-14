@@ -1,37 +1,38 @@
 /**
- * FASE 18.2 — POST /api/media/upload-local
+ * FASE 18.2 — POST /api/media/upload-local [DEPRECADO — FASE 21]
  *
  * Subida de archivos locales (sin Supabase Storage) que además crea
  * publication_jobs en 'pending' para los 4 destinos (IG, YT, FB, TT).
  *
- * Recibe multipart/form-data con uno o más archivos.
- * - Crea un source con provider='local'
- * - Crea media_items con source_provider='local' y la URL como data: URL
- * - Crea 4 publication_jobs en 'pending' por cada archivo (uno por destino)
- * - NO usa supabase.storage (todo en memoria/BD)
+ * DEPRECADO: Vercel limita el body de las Functions a 4.5MB
+ * (FUNCTION_PAYLOAD_TOO_LARGE). Esta ruta responde 413 a propósito para
+ * guiar al cliente al flujo directo:
+ *   POST /api/media/upload-url (JSON) -> PUT directo a Storage -> POST /api/media/finalize-upload
+ * Se mantiene solo como guarda de compatibilidad; el frontend ya usa
+ * uploadFilesDirect() y nunca llama aquí con binarios.
  *
- * Body: FormData con campo 'files' (uno o más File)
+ * Body legacy: FormData con campo 'files' (uno o más File)
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-// Destinos fijos para publication_jobs
-const DESTINATIONS = ['instagram', 'youtube', 'facebook', 'tiktok'] as const;
-
-export async function POST(request: Request) {
+export async function POST() {
+  // FASE 21 — Ruta vieja deshabilitada a propósito: el binario por la
+  // Function revienta el límite de 4.5MB de Vercel. Usar flujo directo.
+  return NextResponse.json(
+    {
+      error: 'use direct upload',
+      message:
+        'Esta ruta ya no acepta archivos. Usa POST /api/media/upload-url -> PUT directo a Storage -> POST /api/media/finalize-upload.',
+    },
+    { status: 413 }
+  );
+  /*
   try {
-    const supabase = await createClient();
-
-    // Verificar autenticación
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
-    }
+    // Single-owner: nunca 401 (la app no tiene login propio).
+    const userId = await getUserIdAllowDev(request);
+    const supabase = createServerClient();
 
     // Parsear FormData
     const formData = await request.formData();
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     const { data: source, error: sourceError } = await supabase
       .from('sources')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         original_url: `local://${validFiles[0].name}`,
         provider: 'local',
         identifier: `local_${Date.now()}`,
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     const { data: publication, error: pubError } = await supabase
       .from('publications')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         source_id: source.id,
         caption: '',
         status: 'processing',
@@ -168,6 +169,8 @@ export async function POST(request: Request) {
           social_account_id: null,
           provider,
           source_provider: 'local',
+          // Columnas obligatorias del esquema base de publication_jobs.
+          type: 'publish',
           status: 'pending',
           attempts: 0,
           max_attempts: 3,
@@ -210,4 +213,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  */
 }

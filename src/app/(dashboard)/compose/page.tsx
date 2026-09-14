@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@/components/ui';
+import { uploadFilesDirect } from '@/lib/upload/direct-upload';
 import { cn } from '@/utils';
 
 type Platform = 'instagram' | 'youtube' | 'facebook' | 'tiktok';
@@ -175,17 +176,12 @@ export default function ComposePage() {
     const uploaded: Array<{ localId: string; mediaId: string | null }> = [];
     setUploading(true);
     try {
-      const fd = new FormData();
-      vids.forEach((v) => fd.append('files', v));
-      const res = await fetch('/api/media/upload-local', { method: 'POST', body: fd });
-      const body = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        mediaItems?: Array<{ id: string }>;
-      };
-      if (!res.ok || !body.success) throw new Error(body.error ?? 'Error al subir los videos');
+      // FASE 21 — Subida directa navegador → Supabase Storage (URLs firmadas).
+      // El binario no pasa por la API route: evita el 413 de Vercel
+      // (FUNCTION_PAYLOAD_TOO_LARGE, body máximo de 4.5MB por Function).
+      const body = await uploadFilesDirect(vids, { createJobs: true });
       items.forEach((it, i) => {
-        const mediaId = body.mediaItems?.[i]?.id ?? null;
+        const mediaId = body.mediaItems[i]?.id ?? null;
         uploaded.push({ localId: it.localId, mediaId });
         updateFile(
           it.localId,
@@ -196,8 +192,8 @@ export default function ComposePage() {
       });
       toast.success(`${vids.length} video(s) subido(s)`);
       // Proceso FFmpeg → status READY (secuencial)
-      for (let i = 0; i < (body.mediaItems ?? []).length; i++) {
-        const mediaId = body.mediaItems?.[i]?.id;
+      for (let i = 0; i < body.mediaItems.length; i++) {
+        const mediaId = body.mediaItems[i]?.id;
         const localId = items[i]?.localId;
         if (!mediaId || !localId) continue;
         updateFile(localId, { processStatus: 'processing' });

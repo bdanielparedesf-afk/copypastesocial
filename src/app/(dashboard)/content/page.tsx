@@ -20,6 +20,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { CSSProperties, RefObject, MouseEvent as ReactMouseEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { uploadFilesDirect } from '@/lib/upload/direct-upload';
 import Link from 'next/link';
 import {
   ArrowDownWideNarrow,
@@ -1748,31 +1749,21 @@ export default function ContentPage() {
     setLocalUploadProgress(`Subiendo ${fileArray.length} archivo(s)...`);
 
     try {
-      const formData = new FormData();
-      for (const file of fileArray) {
-        formData.append('files', file);
-      }
+      // FASE 21 — Subida directa navegador → Supabase Storage (URLs firmadas).
+      // El binario no pasa por la API route: evita el 413 de Vercel
+      // (FUNCTION_PAYLOAD_TOO_LARGE, body máximo de 4.5MB por Function).
+      const body = await uploadFilesDirect(fileArray, { createJobs: false });
 
-      const res = await fetch('/api/media/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const body = await res.json();
-
-      if (res.ok && body.success) {
-        setLocalUploadProgress(`✓ ${body.imported} archivo(s) subido(s) correctamente`);
-        toast.success(`${body.imported} videos en cola - Click PROCESAR COLA en /publications`);
-        // Recargar contenido
-        await fetchData(true);
-        // Limpiar progreso después de 3s
-        setTimeout(() => setLocalUploadProgress(null), 3000);
-      } else {
-        setLocalUploadProgress(`Error: ${body.error ?? 'No se pudieron subir los archivos'}`);
-        setTimeout(() => setLocalUploadProgress(null), 5000);
-      }
-    } catch {
-      setLocalUploadProgress('Error de conexión al subir archivos');
+      setLocalUploadProgress(`✓ ${body.imported} archivo(s) subido(s) correctamente`);
+      toast.success(`${body.imported} videos en cola - Click PROCESAR COLA en /publications`);
+      // Recargar contenido
+      await fetchData(true);
+      // Limpiar progreso después de 3s
+      setTimeout(() => setLocalUploadProgress(null), 3000);
+    } catch (e) {
+      setLocalUploadProgress(
+        `Error: ${e instanceof Error ? e.message : 'No se pudieron subir los archivos'}`
+      );
       setTimeout(() => setLocalUploadProgress(null), 5000);
     } finally {
       setLocalUploading(false);

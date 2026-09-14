@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { listAccounts } from '@/lib/accounts';
 import { enqueuePost, processPost } from '@/lib/publishing';
 
@@ -96,8 +97,8 @@ interface CreatedItem {
 export async function POST(request: NextRequest) {
   const admin = createServerClient();
 
-  const { data: { user } } = await admin.auth.getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 (la app no tiene login propio).
+  const user = { id: await getUserIdAllowDev(request) };
 
   let body: unknown;
   try {

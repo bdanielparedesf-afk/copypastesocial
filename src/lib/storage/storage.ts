@@ -55,8 +55,11 @@ function getStorageClient(): any {
 
 const ensuredBuckets = new Set<StorageBucket>();
 
-/** Crea el bucket si aún no existe (idempotente, patrón supabase/storage.ts). */
-async function ensureBucket(bucket: StorageBucket): Promise<void> {
+/**
+ * Crea el bucket si aún no existe (idempotente, patrón supabase/storage.ts).
+ * Exportado también para el flujo de subida directa (signed-upload.ts).
+ */
+export async function ensureStorageBucket(bucket: StorageBucket): Promise<void> {
   if (ensuredBuckets.has(bucket)) return;
 
   const client = getStorageClient();
@@ -83,7 +86,7 @@ export async function uploadFile(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  await ensureBucket(bucket);
+  await ensureStorageBucket(bucket);
 
   const client = getStorageClient();
   const { error } = await client.storage.from(bucket).upload(path, buffer, {
