@@ -1,35 +1,25 @@
-/**
- * FASE 9 — GET /api/auth/instagram/callback
- *
- * Callback del Facebook Login de Instagram. Recibe `?code=` + `state`,
- * y ejecuta el flujo OAuth real:
- *   1. exchangeCode(code, redirectUri) → token corto (~2h)
- *   2. getLongLivedToken(corto) → token long-lived (~60 dias)
- *   3. getUserProfile(longLived) → perfil IG (username, id)
- *   4. saveInstagramToken() → guarda en provider_tokens
- *      + sincroniza social_accounts (encriptado)
- * Redirige a /accounts?connected=instagram (o ?error=... si algo falla).
- *
- * FASE 20: Auth 401 si no hay usuario.
- */
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase';
 import { exchangeCode, getLongLivedToken, getUserProfile } from '@/lib/providers/instagram/auth';
 import { saveInstagramToken } from '@/lib/providers/instagram/token';
-import { resolveUserId } from '@/lib/supabase/api';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+function resolveOrigin(request: NextRequest): string {
+  const fromRequest = request.nextUrl?.origin;
+  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
+  if (env) return env;
+  return process.env.NODE_ENV === 'production'
+    ? 'https://copypastesocial.vercel.app'
+    : 'http://localhost:3000';
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const supabase = createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = await getUserIdAllowDev();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const origin = request.nextUrl?.origin ?? DEFAULT_ORIGIN;
+  const origin = resolveOrigin(request);
   const redirectUri = `${origin}/api/auth/instagram/callback`;
 
   const code = request.nextUrl.searchParams.get('code');
@@ -65,7 +55,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const shortToken = await exchangeCode(code, redirectUri);
     const longToken = await getLongLivedToken(shortToken.accessToken);
     const profile = await getUserProfile(longToken.accessToken);
-    const userId = await resolveUserId();
     await saveInstagramToken(userId, {
       accessToken: longToken.accessToken,
       expiresAt: longToken.expiresAt,
@@ -83,3 +72,4 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(accountsUrl);
   }
 }
+

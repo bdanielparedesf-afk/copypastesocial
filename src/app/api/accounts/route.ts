@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import {
   listAccounts,
   disconnectAccount,
@@ -8,15 +9,9 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-async function currentUserId(): Promise<string | null> {
-  const admin = createServerClient();
-  const { data: { user } } = await admin.auth.getUser();
-  return user?.id ?? null;
-}
-
 export async function GET() {
   try {
-    const userId = await currentUserId();
+    const userId = await getUserIdAllowDev();
     if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     // FASE 11: listAccounts con provider_tokens.is_valid + expires_at + límites
     const accounts = await listAccounts(userId);
@@ -45,7 +40,7 @@ export async function GET() {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await currentUserId();
+    const userId = await getUserIdAllowDev();
     if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     const accountId = request.nextUrl.searchParams.get('account_id');
 
@@ -66,3 +61,4 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+

@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+function resolveOrigin(request: NextRequest): string {
+  const fromRequest = request.nextUrl?.origin;
+  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
+  if (env) return env;
+  return process.env.NODE_ENV === 'production'
+    ? 'https://copypastesocial.vercel.app'
+    : 'http://localhost:3000';
+}
 
 function buildState(provider: string): string {
   return Buffer.from(JSON.stringify({ provider, ts: Date.now() })).toString('base64url');
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const supabase = createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = await getUserIdAllowDev();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const origin = request.nextUrl?.origin ?? DEFAULT_ORIGIN;
+  const origin = resolveOrigin(request);
 
   const state = buildState('facebook');
   const redirectUri = `${origin}/api/auth/facebook/callback`;
@@ -37,3 +42,4 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 }
 
 export { handle as GET, handle as POST };
+

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+function resolveOrigin(request: NextRequest): string {
+  const fromRequest = request.nextUrl?.origin;
+  if (fromRequest && fromRequest.startsWith('http')) return fromRequest;
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/$/, '');
+  if (env) return env;
+  return process.env.NODE_ENV === 'production'
+    ? 'https://copypastesocial.vercel.app'
+    : 'http://localhost:3000';
+}
 
 interface ProviderAuthUrl {
   url: string;
@@ -56,11 +64,8 @@ function clientIdFor(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const supabase = createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = await getUserIdAllowDev();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   let provider: string | null = null;
 
@@ -84,13 +89,29 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Provider no soportado' }, { status: 400 });
   }
 
+  if (provider === 'youtube') {
+    const clientId = (clientIdFor(provider) ?? '').trim();
+    if (!clientId || clientId.includes('your-google-client-id')) {
+      return NextResponse.json(
+        {
+          error:
+            'YouTube no configurado: falta GOOGLE_CLIENT_ID real en .env.local (local) y en Vercel (producción).',
+        },
+        { status: 500 }
+      );
+    }
+  }
+
+  const origin = resolveOrigin(request);
   const state = Buffer.from(JSON.stringify({ provider })).toString('base64url');
 
+  // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
+  const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
   const params = new URLSearchParams({
     client_id: clientIdFor(provider),
-    redirect_uri: `${DEFAULT_ORIGIN}/api/auth/${provider}/callback`,
+    redirect_uri: `${origin}/api/auth/${provider}/callback`,
     response_type: 'code',
-    scope: auth.scopes.join(','),
+    scope: auth.scopes.join(scopeSep),
     state,
   });
 
@@ -103,3 +124,4 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 }
 
 export { handle as GET, handle as POST };
+

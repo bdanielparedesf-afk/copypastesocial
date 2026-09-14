@@ -127,7 +127,7 @@ export async function listAccounts(userId: string): Promise<AccountWithToken[]> 
       .from('provider_tokens')
       .select('*')
       .eq('social_account_id', String(account.id))
-      .in('provider', ['instagram', 'youtube'])
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
