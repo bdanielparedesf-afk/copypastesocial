@@ -82,16 +82,21 @@ function isoFromExpiresIn(expiresIn: number | string | undefined): string | null
 
 /**
  * 1) URL del Facebook Login para conectar una cuenta de Instagram.
- *    Scopes: instagram_basic + instagram_content_publish + pages_show_list
- *    (business_management para leer el perfil de negocio).
+ *    Scopes App 1231742610032848 (Graph v19.0, Instagram Business API):
+ *    instagram_business_basic + instagram_business_content_publish +
+ *    manage_comments/messages/insights + pages_* (para descubrir la IG Business).
  */
 export function getAuthUrl(options: AuthUrlOptions): string {
   const cfg = config.providers.instagram;
   const scopes = [
-    'instagram_basic',
-    'instagram_content_publish',
+    'public_profile',
     'pages_show_list',
-    'business_management',
+    'pages_read_engagement',
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_comments',
+    'instagram_business_manage_messages',
+    'instagram_business_manage_insights',
     ...(options.extraScopes ?? []),
   ];
 

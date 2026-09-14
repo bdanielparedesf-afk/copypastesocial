@@ -24,14 +24,34 @@ function buildAuthUrl(provider: string): ProviderAuthUrl | null {
     case 'instagram':
       return {
         url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
-        scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'],
+        scopes: [
+          'public_profile',
+          'pages_show_list',
+          'pages_read_engagement',
+          'instagram_business_basic',
+          'instagram_business_content_publish',
+          'instagram_business_manage_comments',
+          'instagram_business_manage_messages',
+          'instagram_business_manage_insights',
+        ],
       };
     case 'facebook':
       return {
         url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
         // NOTA: 'publish_video' NO existe en Meta → causaba error de OAuth.
-        // Para publicar video en Pages basta con pages_manage_posts (+ lectura).
-        scopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'],
+        // App 1231742610032848 (Graph v19.0): Pages + Instagram Business.
+        scopes: [
+          'public_profile',
+          'pages_show_list',
+          'pages_read_engagement',
+          'pages_manage_posts',
+          'pages_manage_engagement',
+          'instagram_business_basic',
+          'instagram_business_content_publish',
+          'instagram_business_manage_comments',
+          'instagram_business_manage_messages',
+          'instagram_business_manage_insights',
+        ],
       };
     case 'youtube':
       return {

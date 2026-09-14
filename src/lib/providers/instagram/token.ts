@@ -55,7 +55,10 @@ async function getOrCreateSocialAccount(
       access_token: '',
       refresh_token: null,
       expires_at: null,
-      scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list'],
+      scopes: ['public_profile', 'pages_show_list', 'pages_read_engagement',
+        'instagram_business_basic', 'instagram_business_content_publish',
+        'instagram_business_manage_comments', 'instagram_business_manage_messages',
+        'instagram_business_manage_insights'],
       is_valid: true,
     })
     .select('id')
@@ -99,7 +102,10 @@ export async function saveInstagramToken(
       token_type: 'long-lived',
       ig_user_id: options.profile.id,
       username: options.profile.username,
-      scopes: options.scopes ?? ['instagram_basic', 'instagram_content_publish', 'pages_show_list'],
+      scopes: options.scopes ?? ['public_profile', 'pages_show_list', 'pages_read_engagement',
+        'instagram_business_basic', 'instagram_business_content_publish',
+        'instagram_business_manage_comments', 'instagram_business_manage_messages',
+        'instagram_business_manage_insights'],
       expires_at:
         options.expiresAt ??
         new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),

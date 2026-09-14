@@ -6,9 +6,16 @@ export const config = {
   },
   providers: {
         instagram: {
-      appId: process.env.META_APP_ID,
-      appSecret: process.env.META_APP_SECRET,
-      graphApiVersion: 'v18.0',
+      // App Facebook 1231742610032848 — aliases nuevos con fallback al META_* legacy.
+      appId:
+        process.env.FACEBOOK_APP_ID ??
+        process.env.FACEBOOK_CLIENT_ID ??
+        process.env.META_APP_ID,
+      appSecret:
+        process.env.FACEBOOK_APP_SECRET ??
+        process.env.FACEBOOK_CLIENT_SECRET ??
+        process.env.META_APP_SECRET,
+      graphApiVersion: 'v19.0',
       graphApiUrl: 'https://graph.facebook.com',
     },
     youtube: {
@@ -18,9 +25,16 @@ export const config = {
       baseUrl: 'https://www.googleapis.com/youtube/v3',
     },
     facebook: {
-      appId: process.env.META_APP_ID,
-      appSecret: process.env.META_APP_SECRET,
-      graphApiVersion: 'v18.0',
+      // App Facebook 1231742610032848 — aliases nuevos con fallback al META_* legacy.
+      appId:
+        process.env.FACEBOOK_APP_ID ??
+        process.env.FACEBOOK_CLIENT_ID ??
+        process.env.META_APP_ID,
+      appSecret:
+        process.env.FACEBOOK_APP_SECRET ??
+        process.env.FACEBOOK_CLIENT_SECRET ??
+        process.env.META_APP_SECRET,
+      graphApiVersion: 'v19.0',
       graphApiUrl: 'https://graph.facebook.com',
     },
     tiktok: {

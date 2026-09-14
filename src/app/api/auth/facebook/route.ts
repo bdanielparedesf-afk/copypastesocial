@@ -25,10 +25,24 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const origin = resolveOrigin(request);
 
   const state = buildState('facebook');
-  const redirectUri = `${origin}/api/auth/facebook/callback`;
+  // URI canónica = la registrada en Facebook Developers
+  // (Productos > Facebook Login > URI de redirección válidos).
+  const redirectUri = `${origin}/api/auth/callback/facebook`;
 
-  // Scopes válidos de Meta. 'publish_video' NO existe → se eliminó.
-  const scopes = ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'];
+  // Scopes App 1231742610032848 (Graph v19.0): Pages + Instagram Business.
+  // 'publish_video' NO existe → no usar. Instagram usa instagram_business_* (no los legacy instagram_basic).
+  const scopes = [
+    'public_profile',
+    'pages_show_list',
+    'pages_read_engagement',
+    'pages_manage_posts',
+    'pages_manage_engagement',
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_comments',
+    'instagram_business_manage_messages',
+    'instagram_business_manage_insights',
+  ];
   const params = new URLSearchParams({
     client_id: config.providers.facebook.appId ?? '',
     redirect_uri: redirectUri,
