@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
-import { redirectUriFor } from '@/lib/oauth';
+import { buildOAuthState, redirectUriFor, TIKTOK_AUTH_URL, TIKTOK_SCOPES } from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,9 +51,10 @@ function buildAuthUrl(provider: string): ProviderAuthUrl | null {
       };
     case 'tiktok':
       return {
-        // Endpoint v2 correcto con slash final
-        url: 'https://www.tiktok.com/v2/auth/authorize/',
-        scopes: ['user.info.basic', 'video.publish'],
+        // Endpoint v2 de Login Kit (slash final obligatorio).
+        url: TIKTOK_AUTH_URL,
+        // TikTok espera los scopes separados por COMAS.
+        scopes: TIKTOK_SCOPES.split(','),
       };
     default:
       return null;
@@ -132,7 +133,9 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   }
 
   const origin = resolveOrigin(request);
-  const state = Buffer.from(JSON.stringify({ provider })).toString('base64url');
+  // State firmado (HMAC + timestamp) — mismo formato que /api/auth/<provider>,
+  // requerido por los callbacks (validación anti-CSRF).
+  const state = buildOAuthState(provider);
 
   // URL canónica del redirect_uri por provider (lee @/lib/oauth).
   // Meta (FB+IG) usa una sola URI: /api/auth/callback/facebook ; el resto usa
@@ -157,8 +160,9 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&config_id=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
   } else {
     // YouTube / TikTok: construir con scopes tradicionales.
-    // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
-    const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
+    // TikTok y Meta esperan la lista de scopes separada por COMAS;
+    // Google (YouTube) la espera separada por espacios.
+    const scopeSep = provider === 'youtube' ? ' ' : ',';
     const params = new URLSearchParams({
       redirect_uri: redirectUri,
       response_type: 'code',

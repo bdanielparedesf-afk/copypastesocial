@@ -5,8 +5,10 @@ import { config } from '@/config';
 import { tokenService } from '@/services/TokenService';
 import {
   canonicalOrigin,
+  isOAuthStateFresh,
   redirectUriFor,
-  parseOAuthState,
+  verifyOAuthState,
+  TIKTOK_SCOPES,
 } from '@/lib/oauth';
 
 export const dynamic = 'force-dynamic';
@@ -53,11 +55,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(accountsUrl);
   }
 
-  // CSRF: el state debe estar presente y decodificar provider='tiktok'.
-  // Si falta o no coincide, rechazar el request.
-  const stateProvider = parseOAuthState(state);
-  if (!state || !stateProvider || stateProvider !== 'tiktok') {
+  // CSRF: el state debe venir FIRMADO (HMAC-SHA256), con provider='tiktok' y
+  // vigente. Si falta, está alterado/forjado o expiró → rechazar el request.
+  const verifiedState = verifyOAuthState(state);
+  if (!verifiedState || verifiedState.provider !== 'tiktok') {
     accountsUrl.searchParams.set('error', 'state_mismatch');
+    return NextResponse.redirect(accountsUrl);
+  }
+  if (!isOAuthStateFresh(verifiedState.ts)) {
+    accountsUrl.searchParams.set('error', 'state_expired');
     return NextResponse.redirect(accountsUrl);
   }
 
@@ -142,7 +148,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       access_token: encryptedAccess,
       refresh_token: encryptedRefresh,
       expires_at: expiresAt,
-      scopes: ['user.info.basic', 'video.publish'] as string[],
+      // Scopes realmente concedidos por el usuario: TikTok los devuelve en
+      // `scope` separados por comas. Fallback a los solicitados.
+      scopes: (
+        typeof tokenBody.scope === 'string' && tokenBody.scope.trim()
+          ? String(tokenBody.scope).split(',')
+          : TIKTOK_SCOPES.split(',')
+      )
+        .map((s) => s.trim())
+        .filter(Boolean) as string[],
       is_valid: true,
       updated_at: new Date().toISOString(),
     };

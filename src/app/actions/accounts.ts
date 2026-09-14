@@ -3,6 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { supabase } from '@/lib/supabase';
 import { tokenService } from '@/services/TokenService';
+import {
+  buildOAuthState,
+  redirectUriFor,
+  TIKTOK_AUTH_URL,
+  TIKTOK_SCOPES,
+} from '@/lib/oauth';
 import type { SocialAccount, ProviderId } from '@/types';
 
 export interface SocialAccountView {
@@ -87,8 +93,18 @@ export function getOAuthUrl(provider: ProviderId): string {
       return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=youtube&response_type=code&access_type=offline&prompt=consent&scope=https://www.googleapis.com/auth/youtube.upload`;
     }
     case 'tiktok': {
-      const redirectUri = `${baseUrl}/api/auth/callback/tiktok`;
-      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${process.env.TIKTOK_CLIENT_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&state=tiktok&scope=user.info.basic,video.publish&response_type=code`;
+      // Un único builder canónico de TikTok (mismo que /api/auth/tiktok y
+      // /api/auth/connect): redirect_uri EXACTO al whitelisteado en TikTok
+      // Developers → Login Kit + state FIRMADO (anti-CSRF) + scopes separados
+      // por comas leídos de TIKTOK_SCOPES.
+      const params = new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_KEY ?? '',
+        response_type: 'code',
+        scope: TIKTOK_SCOPES,
+        redirect_uri: redirectUriFor('tiktok', baseUrl),
+        state: buildOAuthState('tiktok'),
+      });
+      return `${TIKTOK_AUTH_URL}?${params.toString()}`;
     }
     default:
       return '#';
