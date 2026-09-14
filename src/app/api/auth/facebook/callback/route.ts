@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
-import { getUserIdAllowDev, DEV_USER_ID } from '@/lib/dev-auth';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 import { tokenService } from '@/services/TokenService';
 
@@ -17,8 +17,10 @@ function resolveOrigin(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // El callback del provider NO puede exigir sesión previa: el usuario viene
+  // de Meta/Google/TikTok sin cookies de Supabase. Se resuelve el owner
+  // single-owner y se guarda bajo ese user_id.
+  const userId = await getUserIdAllowDev(request);
 
   const origin = resolveOrigin(request);
   const redirectUri = `${origin}/api/auth/facebook/callback`;
@@ -90,7 +92,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const encryptedRefresh = tokenData2.refreshToken ? tokenService.encrypt(tokenData2.refreshToken) : null;
 
     const admin = createServerClient();
-    const ownerId = process.env.NODE_ENV === 'production' ? userId : DEV_USER_ID;
+    const ownerId = userId;
     const { data: existing } = await admin
       .from('social_accounts')
       .select('id')
@@ -106,7 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       access_token: encryptedAccess,
       refresh_token: encryptedRefresh,
       expires_at: tokenData2.expiresAt,
-      scopes: ['pages_manage_posts', 'pages_read_engagement', 'publish_video'] as string[],
+      scopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'] as string[],
       is_valid: true,
       updated_at: new Date().toISOString(),
     };

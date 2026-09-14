@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { switchAccount } from '@/lib/accounts';
 
 export const dynamic = 'force-dynamic';
@@ -11,11 +11,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const admin = createServerClient();
-
-  const { data: { user } } = await admin.auth.getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  const userId = user.id;
+  // Single-owner: nunca 401 (la app no tiene login propio).
+  const userId = await getUserIdAllowDev(request);
 
   let body: unknown;
   try {

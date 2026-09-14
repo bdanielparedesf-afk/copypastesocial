@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Single-owner: nunca 401 (la app no tiene login propio).
+  const user = { id: await getUserIdAllowDev(request) };
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
+  const supabase = createServerClient();
   const { error } = await supabase
     .from('social_accounts')
     .delete()

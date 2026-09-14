@@ -19,15 +19,16 @@ function buildState(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 aquí (la app no tiene login propio).
+  await getUserIdAllowDev(request);
 
   const origin = resolveOrigin(request);
 
   const state = buildState('facebook');
   const redirectUri = `${origin}/api/auth/facebook/callback`;
 
-  const scopes = ['pages_manage_posts', 'pages_read_engagement', 'publish_video'];
+  // Scopes válidos de Meta. 'publish_video' NO existe → se eliminó.
+  const scopes = ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'];
   const params = new URLSearchParams({
     client_id: config.providers.facebook.appId ?? '',
     redirect_uri: redirectUri,

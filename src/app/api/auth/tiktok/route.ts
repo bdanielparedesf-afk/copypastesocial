@@ -19,8 +19,8 @@ function buildState(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 aquí (la app no tiene login propio).
+  await getUserIdAllowDev(request);
 
   const origin = resolveOrigin(request);
 
@@ -31,7 +31,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     client_key: config.providers.tiktok.clientKey ?? '',
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'video.publish user.info.basic',
+    // Orden canónico TikTok: user.info.basic primero
+    scope: 'user.info.basic video.publish',
   });
   params.set('state', state);
 

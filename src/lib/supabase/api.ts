@@ -11,8 +11,8 @@
 import { supabase, createServerClient } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-/** Usuario de desarrollo usado cuando no hay sesión activa (patrón publish.ts). */
-export const DEV_USER_ID = '00000000-0000-0000-0000-000000000000';
+/** Usuario único cuando no hay sesión (single-owner, mismo que dev-auth). */
+export const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 export function getDbClient(): SupabaseClient {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {

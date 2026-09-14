@@ -20,8 +20,8 @@ function buildState(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 aquí (la app no tiene login propio).
+  await getUserIdAllowDev(request);
 
   const clientId = (config.providers.youtube.clientId ?? '').trim();
   const clientSecret = (config.providers.youtube.clientSecret ?? '').trim();

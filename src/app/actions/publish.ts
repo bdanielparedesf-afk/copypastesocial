@@ -36,7 +36,8 @@ async function currentUserId(): Promise<string> {
   } catch {
     // sin sesión activa
   }
-  return '00000000-0000-0000-0000-000000000000';
+  // Mismo owner único que dev-auth/supabase/api (single-owner, no fragmentar user_id).
+  return '00000000-0000-0000-0000-000000000001';
 }
 
 export async function createPublication(input: {

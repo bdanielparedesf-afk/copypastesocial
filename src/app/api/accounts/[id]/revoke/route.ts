@@ -1,16 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { tokenService } from '@/services/TokenService';
 import type { SocialAccount } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 (la app no tiene login propio).
+  // Se valida ownership filtrando por user_id en la query.
+  const ownerId = await getUserIdAllowDev(request);
 
   const { id } = await params;
 
@@ -18,6 +18,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .from('social_accounts')
     .select('*')
     .eq('id', id)
+    .eq('user_id', ownerId)
     .single();
 
   if (error || !data) {

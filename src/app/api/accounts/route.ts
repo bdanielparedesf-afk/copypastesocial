@@ -9,10 +9,10 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserIdAllowDev();
-    if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Single-owner: nunca 401 (la app no tiene login propio).
+    const userId = await getUserIdAllowDev(request);
     // FASE 11: listAccounts con provider_tokens.is_valid + expires_at + límites
     const accounts = await listAccounts(userId);
 
@@ -40,8 +40,8 @@ export async function GET() {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await getUserIdAllowDev();
-    if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Single-owner: nunca 401 (la app no tiene login propio).
+    const userId = await getUserIdAllowDev(request);
     const accountId = request.nextUrl.searchParams.get('account_id');
 
     if (!accountId) {

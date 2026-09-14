@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
-import { getUserIdAllowDev, DEV_USER_ID } from '@/lib/dev-auth';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { config } from '@/config';
 import { tokenService } from '@/services/TokenService';
 
@@ -17,8 +17,8 @@ function resolveOrigin(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // El callback del provider NO puede exigir sesión previa.
+  const userId = await getUserIdAllowDev(request);
 
   const origin = resolveOrigin(request);
   const redirectUri = `${origin}/api/auth/youtube/callback`;
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const encryptedRefresh = refreshToken ? tokenService.encrypt(refreshToken) : null;
 
     const admin = createServerClient();
-    const ownerId = process.env.NODE_ENV === 'production' ? userId : DEV_USER_ID;
+    const ownerId = userId;
     const { data: existing } = await admin
       .from('social_accounts')
       .select('id')

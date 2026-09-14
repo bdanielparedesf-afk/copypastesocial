@@ -24,12 +24,14 @@ function buildAuthUrl(provider: string): ProviderAuthUrl | null {
     case 'instagram':
       return {
         url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
-        scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list'],
+        scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'],
       };
     case 'facebook':
       return {
         url: `https://www.facebook.com/${config.providers.facebook.graphApiVersion}/dialog/oauth`,
-        scopes: ['pages_manage_posts', 'pages_read_engagement', 'publish_video'],
+        // NOTA: 'publish_video' NO existe en Meta → causaba error de OAuth.
+        // Para publicar video en Pages basta con pages_manage_posts (+ lectura).
+        scopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'],
       };
     case 'youtube':
       return {
@@ -41,8 +43,9 @@ function buildAuthUrl(provider: string): ProviderAuthUrl | null {
       };
     case 'tiktok':
       return {
+        // Endpoint v2 correcto con slash final
         url: 'https://www.tiktok.com/v2/auth/authorize/',
-        scopes: ['video.publish', 'user.info.basic'],
+        scopes: ['user.info.basic', 'video.publish'],
       };
     default:
       return null;
@@ -64,8 +67,8 @@ function clientIdFor(provider: string): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Single-owner: nunca 401 aquí (la app no tiene login propio).
+  await getUserIdAllowDev(request);
 
   let provider: string | null = null;
 
@@ -91,12 +94,35 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 
   if (provider === 'youtube') {
     const clientId = (clientIdFor(provider) ?? '').trim();
-    if (!clientId || clientId.includes('your-google-client-id')) {
+    const clientSecret = (config.providers.youtube.clientSecret ?? '').trim();
+    if (!clientId || !clientSecret || clientId.includes('your-google-client-id') || clientSecret.includes('your-google-client-secret')) {
       return NextResponse.json(
         {
           error:
-            'YouTube no configurado: falta GOOGLE_CLIENT_ID real en .env.local (local) y en Vercel (producción).',
+            'YouTube no configurado: falta GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET reales en .env.local (local) y en Vercel (producción).',
         },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (provider === 'instagram' || provider === 'facebook') {
+    const appId = (config.providers.facebook.appId ?? '').trim();
+    const appSecret = (config.providers.facebook.appSecret ?? '').trim();
+    if (!appId || !appSecret) {
+      return NextResponse.json(
+        { error: 'Meta no configurado: falta META_APP_ID / META_APP_SECRET reales en .env.local (local) y en Vercel (producción).' },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (provider === 'tiktok') {
+    const key = (config.providers.tiktok.clientKey ?? '').trim();
+    const secret = (config.providers.tiktok.clientSecret ?? '').trim();
+    if (!key || !secret) {
+      return NextResponse.json(
+        { error: 'TikTok no configurado: falta TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET reales en .env.local (local) y en Vercel (producción).' },
         { status: 500 }
       );
     }

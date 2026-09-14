@@ -16,8 +16,8 @@ function resolveOrigin(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const userId = await getUserIdAllowDev();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // El callback del provider NO puede exigir sesión previa.
+  const userId = await getUserIdAllowDev(request);
 
   const origin = resolveOrigin(request);
   const redirectUri = `${origin}/api/auth/instagram/callback`;
