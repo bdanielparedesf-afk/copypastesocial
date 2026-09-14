@@ -72,17 +72,24 @@ export async function revokeAccount(accountId: string): Promise<{ success: boole
 
 export function getOAuthUrl(provider: ProviderId): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const redirectUri = `${baseUrl}/api/auth/${provider}/callback`;
 
   switch (provider) {
-    case 'facebook':
+    case 'facebook': {
+      const redirectUri = `${baseUrl}/api/auth/callback/facebook`;
       return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=facebook&scope=pages_manage_posts,pages_read_engagement,pages_show_list`;
-    case 'instagram':
+    }
+    case 'instagram': {
+      const redirectUri = `${baseUrl}/api/auth/callback/facebook`;
       return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=instagram&scope=instagram_basic,instagram_content_publish,pages_show_list`;
-    case 'youtube':
+    }
+    case 'youtube': {
+      const redirectUri = `${baseUrl}/api/auth/youtube/callback`;
       return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=youtube&response_type=code&access_type=offline&prompt=consent&scope=https://www.googleapis.com/auth/youtube.upload`;
-    case 'tiktok':
-      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${process.env.TIKTOK_CLIENT_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&state=tiktok&scope=video.publish&response_type=code`;
+    }
+    case 'tiktok': {
+      const redirectUri = `${baseUrl}/api/auth/callback/tiktok`;
+      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${process.env.TIKTOK_CLIENT_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&state=tiktok&scope=user.info.basic,video.publish&response_type=code`;
+    }
     default:
       return '#';
   }

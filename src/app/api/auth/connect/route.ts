@@ -160,12 +160,14 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     // YouTube usa scopes separados por espacio; Meta/TikTok también aceptan espacio.
     const scopeSep = provider === 'facebook' || provider === 'instagram' ? ',' : ' ';
     const params = new URLSearchParams({
-      client_id: clientIdFor(provider),
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: auth.scopes.join(scopeSep),
       state,
     });
+    // TikTok usa 'client_key' en lugar de 'client_id' (Login Kit v2).
+    const clientIdParam = provider === 'tiktok' ? 'client_key' : 'client_id';
+    params.set(clientIdParam, clientIdFor(provider));
     if (provider === 'youtube') {
       params.set('access_type', 'offline');
       params.set('prompt', 'consent');

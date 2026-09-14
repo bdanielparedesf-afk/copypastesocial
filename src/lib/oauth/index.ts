@@ -39,20 +39,20 @@ export function canonicalOrigin(requestOrigin?: string | null): string {
 
 /**
  * redirect_uri canónico por provider (mismo path en init y en callback).
- * - Meta (FB+IG) usa UNA sola URI: /api/auth/callback/facebook (el state distingue).
- * - YouTube: /api/auth/youtube/callback
- * - TikTok:  /api/auth/tiktok/callback
+  * - Meta (FB+IG) usa UNA sola URI: /api/auth/callback/facebook (el state distingue).
+ * - TikTok:   /api/auth/callback/tiktok
+ * - YouTube:  /api/auth/youtube/callback
  *
  * URIs a registrar en cada consola (añade AMBAS, local + prod):
  *   - Facebook/Instagram (Meta Developers → Facebook Login → "URI de redirección de OAuth válidos"):
  *       http://localhost:3000/api/auth/callback/facebook
  *       https://copypastesocial.vercel.app/api/auth/callback/facebook
+ *   - TikTok (TikTok Developers → tu app → Login Kit → Redirect URI):
+ *       http://localhost:3000/api/auth/callback/tiktok
+ *       https://copypastesocial.vercel.app/api/auth/callback/tiktok
  *   - YouTube (Google Cloud Console → Credenciales → OAuth Client Web → redirect_uris):
  *       http://localhost:3000/api/auth/youtube/callback
  *       https://copypastesocial.vercel.app/api/auth/youtube/callback
- *   - TikTok (TikTok Developers → tu app → Login Kit → Redirect URI):
- *       http://localhost:3000/api/auth/tiktok/callback
- *       https://copypastesocial.vercel.app/api/auth/tiktok/callback
  */
 export function redirectUriFor(
   provider: 'facebook' | 'instagram' | 'tiktok' | 'youtube',
@@ -61,6 +61,9 @@ export function redirectUriFor(
   const origin = canonicalOrigin(requestOrigin);
   if (provider === 'facebook' || provider === 'instagram') {
     return `${origin}/api/auth/callback/facebook`;
+  }
+  if (provider === 'tiktok') {
+    return `${origin}/api/auth/callback/tiktok`;
   }
   return `${origin}/api/auth/${provider}/callback`;
 }
