@@ -1,4 +1,12 @@
-export const SUPPORTED_PROVIDERS = ['instagram', 'youtube', 'facebook', 'tiktok'] as const;
+export const SUPPORTED_PROVIDERS = [
+  'instagram',
+  'youtube',
+  'facebook',
+  'tiktok',
+  'local',
+  'upload',
+  'direct',
+] as const;
 
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 

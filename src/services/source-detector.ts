@@ -1,4 +1,4 @@
-import type { SourceContentType, SourceDetectionResult, SourceProvider } from '@/types/source';
+import type { SocialSourceProvider, SourceContentType, SourceDetectionResult } from '@/types/source';
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -32,7 +32,7 @@ export function normalizeSourceUrl(url: string): string {
   return normalized;
 }
 
-function detectProviderAndType(url: string): { provider: SourceProvider; contentType: SourceContentType; identifier: string } | null {
+function detectProviderAndType(url: string): { provider: SocialSourceProvider; contentType: SourceContentType; identifier: string } | null {
   const normalized = ensureProtocol(url);
   let parsed: URL;
   try {

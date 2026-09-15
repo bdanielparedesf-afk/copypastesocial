@@ -28,10 +28,10 @@ import { ensureStorageBucket, type StorageBucket } from './storage';
 export const UPLOAD_BUCKET: StorageBucket = 'raw';
 /** Máximo de archivos por tanda (FASE 20). */
 export const MAX_FILES_PER_BATCH = 50;
-/** Máximo por archivo: 100MB. */
-export const MAX_FILE_BYTES = 100 * 1024 * 1024;
-/** Máximo por tanda: 500MB. */
-export const MAX_BATCH_BYTES = 500 * 1024 * 1024;
+/** Máximo por archivo: 1GB (videos de hasta ~10 min). */
+export const MAX_FILE_BYTES = 1024 * 1024 * 1024;
+/** Máximo por tanda: 5GB (hasta 5 videos de 1GB). */
+export const MAX_BATCH_BYTES = 5 * 1024 * 1024 * 1024;
 
 export interface UploadFileInput {
   name: string;
@@ -92,14 +92,14 @@ export function validateUploadFiles(files: UploadFileInput[]): UploadValidation 
   if (oversized) {
     return {
       ok: false,
-      error: `Archivo demasiado grande: ${oversized.name} (máx 100MB)`,
+      error: `Archivo demasiado grande: ${oversized.name} (máx 1GB)`,
       status: 400,
     };
   }
 
   const total = videos.reduce((acc, f) => acc + f.size, 0);
   if (total > MAX_BATCH_BYTES) {
-    return { ok: false, error: 'Max 500MB por tanda', status: 400 };
+    return { ok: false, error: 'Max 5GB por tanda', status: 400 };
   }
 
   return { ok: true, files: videos };

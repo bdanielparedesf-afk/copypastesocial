@@ -56,20 +56,20 @@ describe('validateUploadFiles', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('rechaza archivos de más de 100MB', () => {
+  it('rechaza archivos de más de 1GB', () => {
     const result = validateUploadFiles([video('grande.mp4', MAX_FILE_BYTES + 1)]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('grande.mp4');
   });
 
-  it('rechaza tandas que superan los 500MB en total', () => {
-    // 6 archivos de 90MB: cada uno es válido (< 100MB) pero la suma supera 500MB.
-    const each = 90 * 1024 * 1024;
+  it('rechaza tandas que superan los 5GB en total', () => {
+    // 6 archivos de 900MB: cada uno es válido (< 1GB) pero la suma supera 5GB.
+    const each = 900 * 1024 * 1024;
     const files = Array.from({ length: 6 }, (_, i) => video(`big${i}.mp4`, each));
     expect(each * files.length).toBeGreaterThan(MAX_BATCH_BYTES);
     const result = validateUploadFiles(files);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('500MB');
+    if (!result.ok) expect(result.error).toContain('5GB');
   });
 
   it('acepta una tanda válida y conserva tamaño y tipo', () => {

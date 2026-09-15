@@ -14,6 +14,7 @@ import { createServerClient } from '@/lib/supabase';
 import { processJob } from './publication.service';
 import { errorFactory } from '@/utils/errors';
 import { checkCanPublish } from '@/lib/accounts';
+import { releaseMediaStorage } from '@/lib/storage/cleanup';
 import {
   getAccessToken,
   getSignedProcessedUrl,
@@ -301,6 +302,13 @@ export async function processPost(queueId: string): Promise<QueueItem> {
         message: `processPost: no se pudo marcar PUBLISHED (${updateError?.message ?? 'sin datos'})`,
         body: updateError,
       });
+    }
+
+    // FASE 23 — pass-through: libera fisico si no quedan pendientes.
+    try {
+      await releaseMediaStorage(admin, String(item.media_id));
+    } catch {
+      // best-effort
     }
 
     return updated as QueueItem;

@@ -20,7 +20,7 @@ async function ensureBucket(name: BucketName): Promise<void> {
   await supabase.storage.createBucket(name, {
     public: true,
     allowedMimeTypes: ['video/*', 'image/*', 'audio/*'],
-    fileSizeLimit: 500 * 1024 * 1024, // 500MB
+    fileSizeLimit: 1024 * 1024 * 1024, // 1GB
   });
 }
 

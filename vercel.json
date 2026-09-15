@@ -1,6 +1,12 @@
 {
-  "crons": [{
-    "path": "/api/cron/processQueue",
-    "schedule": "5 3 * * *"
-  }]
+  "crons": [
+    {
+      "path": "/api/cron/processQueue",
+      "schedule": "5 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-storage",
+      "schedule": "15 * * * *"
+    }
+  ]
 }

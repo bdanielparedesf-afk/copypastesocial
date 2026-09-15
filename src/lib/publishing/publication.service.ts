@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProvider } from '@/lib/providers/provider.factory';
 import { assertCanPublish } from './rate-limit.service';
 import { isDuplicate } from './idempotency';
+import { releaseMediaStorage } from '@/lib/storage/cleanup';
 import { AppError } from '@/utils/errors';
 
 type CreatePubParams = {
@@ -129,6 +130,12 @@ export async function processJob(job_id: string): Promise<string> {
           error_message: null,
         })
         .eq('id', job_id);
+      try {
+        const mid = (job.media_id as string | null) ?? null;
+        if (mid) await releaseMediaStorage(supabase, String(mid));
+      } catch {
+        // best-effort
+      }
       return 'success';
     }
 
@@ -170,6 +177,16 @@ export async function processJob(job_id: string): Promise<string> {
         attempts: (job.attempts ?? 0) + 1,
       })
       .eq('id', job_id);
+
+    // FASE 23 — pass-through: libera el fisico SOLO cuando ningun otro
+    // job del media queda pendiente (conteo interno en releaseMediaStorage).
+    if (finalStatus === 'success' && media.id) {
+      try {
+        await releaseMediaStorage(supabase, String(media.id));
+      } catch {
+        // best-effort: no rompe el publish si el borrado falla.
+      }
+    }
 
     return finalStatus;
   } catch (e) {

@@ -10,10 +10,10 @@
  * Este módulo es puro (sin dependencias de Node ni Supabase) para poder
  * importarse tanto en el servidor como en componentes cliente (Dashboard).
  */
-import type { SourceProvider as SourceProviderId, SourceContentType } from '@/types/source';
+import type { SocialSourceProvider, SourceContentType } from '@/types/source';
 
-/** Nombres de plataforma que tienen un SourceProvider implementado. */
-export type SourceProviderName = Exclude<SourceProviderId, 'unsupported'>;
+/** Nombres de plataforma que tienen un SourceProvider implementado (solo sociales con API oficial). */
+export type SourceProviderName = SocialSourceProvider;
 
 /**
  * Resultado de la verificación de accesibilidad de una fuente.

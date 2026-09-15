@@ -217,7 +217,15 @@ export interface PublicationJob {
   createdAt: string;
 }
 
-const providerSchema = z.enum(['instagram', 'youtube', 'facebook', 'tiktok']);
+const providerSchema = z.enum([
+  'instagram',
+  'youtube',
+  'facebook',
+  'tiktok',
+  'local',
+  'upload',
+  'direct',
+]);
 const auditStatusSchema = z.enum([
   'CHECKING',
   'ACCESSIBLE',

@@ -22,8 +22,8 @@ import { uploadFilesDirect } from '@/lib/upload/direct-upload';
 import { cn } from '@/utils';
 
 const MAX_FILES = 50;
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
-const MAX_TOTAL_SIZE = 500 * 1024 * 1024;
+const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB por archivo
+const MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024; // 5GB por tanda
 
 interface UploadModalProps {
   open: boolean;
@@ -83,11 +83,11 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
       let next = [...prev, ...videos.slice(0, room)];
       const total = next.reduce((acc, f) => acc + f.size, 0);
       if (total > MAX_TOTAL_SIZE) {
-        setError('La tanda supera los 500MB. Quita algunos archivos.');
+        setError('La tanda supera los 5GB. Quita algunos archivos.');
         next = prev;
       }
       if (videos.some((f) => f.size > MAX_FILE_SIZE)) {
-        setError('Hay archivos de mas de 100MB (maximo por archivo).');
+        setError('Hay archivos de mas de 1GB (maximo por archivo).');
       }
       if (rejected > 0) {
         toast.warning(`${rejected} archivo(s) ignorados: solo se aceptan videos`);
