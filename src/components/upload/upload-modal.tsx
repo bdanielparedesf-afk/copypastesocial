@@ -245,7 +245,7 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                 </div>
                 <div className="mt-2 flex gap-2">
                   <Link href="/content" onClick={onClose}>
-                    <Button variant="glow" size="lg">
+                    <Button variant="default" size="lg">
                       <Film size={16} />
                       Ver mi contenido
                     </Button>
@@ -413,7 +413,7 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                       : 'Sin archivos seleccionados'}
                   </span>
                   <Button
-                    variant="glow"
+                    variant="default"
                     onClick={handleUpload}
                     disabled={files.length === 0 || uploading}
                     size="lg"

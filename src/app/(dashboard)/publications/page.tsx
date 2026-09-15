@@ -103,7 +103,7 @@ interface PublicationsApiResponse {
 const STATUS_COLORS = {
   success: '#10B981',
   failed: '#EF4444',
-  processing: '#7C3AED',
+  processing: '#06B6D4',
 };
 
 const STATUS_DISPLAY: Record<DerivedStatus, { label: string; color: string; pulse: boolean }> = {
@@ -716,7 +716,7 @@ export default function PublicationsPage() {
           <StatusTabs active={statusTab} onChange={setStatusTab} counts={counts} />
 <div className="flex items-center gap-3">
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={handleProcessQueue}
               disabled={processingQueue || loading}
@@ -730,12 +730,12 @@ export default function PublicationsPage() {
                 <span className={cn(
                   "flex items-center gap-1 rounded-full px-2 py-0.5",
                   queueCounts.pending > 0
-                    ? "bg-[#7C3AED]/20 text-[#7C3AED] animate-pulse"
+                    ? "bg-[#06B6D4]/20 text-[#06B6D4] animate-pulse"
                     : "bg-[#52525B]/20 text-[#52525B]"
                 )}>
                   <span className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    queueCounts.pending > 0 ? "bg-[#7C3AED]" : "bg-[#52525B]"
+                    queueCounts.pending > 0 ? "bg-[#06B6D4]" : "bg-[#52525B]"
                   )} />
                   {queueCounts.pending}
                 </span>

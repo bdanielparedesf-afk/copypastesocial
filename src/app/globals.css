@@ -2,27 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ================================================================
+   CopyPasteSocial — Futuristic Minimalist Theme
+   ============================================================ */
+
 @layer base {
   :root {
+    /* Core neutral scale */
     --background: 240 10% 4%;
     --foreground: 0 0% 98%;
     --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 262 70% 55%;
+
+    /* Brand: cyan dominant, violet accents */
+    --primary: 191 92% 57%;       /* cyan-400 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 6% 15%;
+    --secondary: 240 12% 14%;     /* ink-700 */
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 6% 18%;
+
+    /* Surfaces */
+    --muted: 240 8% 18%;
     --muted-foreground: 240 5% 65%;
-    --accent: 262 70% 55%;
+    --accent: 191 92% 57%;
     --accent-foreground: 0 0% 100%;
+
+    /* States */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 18%;
-    --input: 240 6% 18%;
-    --ring: 262 70% 55%;
+    --border: 240 8% 20%;
+    --input: 240 8% 20%;
+
+    /* Glows */
+    --ring: 191 92% 57%;          /* cyan ring */
+    --glow-cyan: 0 0% 100% / 0.5;
+    --glow-violet: 124 58% 238;   /* violet for status accents */
   }
 
   * {
@@ -32,78 +47,83 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: hsl(240 6% 20%);
-    border-radius: 9999px;
+  /* Smooth transitions for interactive elements */
+  a {
+    @apply text-primary;
+    text-decoration: underline-offset: 4px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(240 6% 28%); }
+
+  /* Scrollbar — minimal tech style */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(240 6% 22%);
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(240 6% 28%);
+  }
 }
 
 @layer utilities {
+  /* Glass system — unified for all depths */
   .glass {
-    background: rgba(21, 21, 23, 0.72);
+    background: rgba(18, 18, 20, 0.65);
     backdrop-filter: blur(20px) saturate(140%);
     -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
+
   .glass-strong {
     background: rgba(10, 10, 11, 0.85);
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
+
+  /* Typography */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-brand;
   }
-    .glow-purple {
+
+  .text-gradient-reverse {
+    @apply bg-clip-text text-transparent bg-gradient-brand-reverse;
+  }
+
+  /* Glows */
+  .glow-cyan {
+    box-shadow: 0 0 40px -8px rgba(6, 182, 212, 0.5);
+  }
+  .glow-violet {
     box-shadow: 0 0 40px -8px rgba(124, 58, 237, 0.5);
   }
-  .glow-cyan {
-    box-shadow: 0 0 40px -8px rgba(6, 182, 212, 0.45);
+  .glow-purple {
+    box-shadow: 0 0 24px -6px rgba(124, 58, 237, 0.55);
   }
 
   /* Audit status badge colors */
-  .status-checking {
-    color: #3B82F6;
-    background: rgba(59, 130, 246, 0.15);
-  }
-  .status-accessible {
-    color: #22C55E;
-    background: rgba(34, 197, 94, 0.15);
-  }
-  .status-private {
-    color: #F59E0B;
-    background: rgba(245, 158, 11, 0.15);
-  }
-  .status-unavailable {
-    color: #EF4444;
-    background: rgba(239, 68, 68, 0.15);
-  }
-  .status-unsupported {
-    color: #8B5CF6;
-    background: rgba(139, 92, 246, 0.15);
-  }
-  .status-auth {
-    color: #EAB308;
-    background: rgba(234, 179, 8, 0.15);
-  }
-  .status-api {
-    color: #F97316;
-    background: rgba(249, 115, 22, 0.15);
-  }
-  .status-error {
-    color: #DC2626;
-    background: rgba(220, 38, 38, 0.15);
-  }
+  .status-checking { color: #38BDF8; background: rgba(56, 200, 248, 0.15); }
+  .status-accessible { color: #22C55E; background: rgba(34, 197, 94, 0.15); }
+  .status-private { color: #F59E0B; background: rgba(245, 158, 11, 0.15); }
+  .status-unavailable { color: #EF4444; background: rgba(239, 68, 68, 0.15); }
+  .status-unsupported { color: #8B5CF6; background: rgba(139, 92, 246, 0.15); }
+  .status-auth { color: #EAB308; background: rgba(234, 179, 8, 0.15); }
+  .status-api { color: #F97316; background: rgba(249, 115, 22, 0.15); }
+  .status-error { color: #DC2626; background: rgba(220, 38, 38, 0.15); }
 
-  /* Layout futurista: aurora, rejilla, borde neon */
+  /* Layout futurista: aurora + grid */
   .app-shell {
-    background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.12), transparent 55%),
+    background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.08), transparent 55%),
       hsl(var(--background));
     min-height: 100vh;
   }
@@ -128,11 +148,28 @@
   }
 }
 
+@layer components {
+  /* Unified toggle pill for all segmented controls */
+  .toggle-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200;
+  }
+
+  /* Minimal card with glass */
+  .card-minimal {
+    @apply rounded-2xl border border-border bg-card/50;
+  }
+
+  /* Provider badges */
+  .provider-badge {
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white;
+  }
+}
+
 @keyframes aurora-float {
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    transform: translate3d(60px, 40px, 0) scale(1.12);
+    transform: translate3d(60px, 40px, 0) scale(1.1);
   }
 }

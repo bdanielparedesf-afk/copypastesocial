@@ -230,7 +230,7 @@ return (
             <Button
               onClick={handlePublish}
               disabled={isPublishing || !selectedSource || !selectedAccount}
-              variant="glow"
+              variant="default"
               size="lg"
               className="w-full"
             >

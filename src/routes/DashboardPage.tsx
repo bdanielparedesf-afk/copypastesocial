@@ -229,7 +229,7 @@ function SourceImportPanel({
           <Button
             onClick={() => onImport(url)}
             disabled={status === 'error'}
-            variant="glow"
+              variant="default"
             size="sm"
           >
             <ClipboardPaste size={13} />

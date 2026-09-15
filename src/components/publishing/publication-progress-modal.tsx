@@ -73,9 +73,9 @@ const STATUS_COLORS = {
   success: '#10B981',
   failed: '#EF4444',
   pending: '#52525B',
-  publishing: '#7C3AED',
-  processing: '#7C3AED',
-  uploading: '#7C3AED',
+  publishing: '#06B6D4',
+  processing: '#06B6D4',
+  uploading: '#06B6D4',
   retrying: '#F59E0B',
 };
 
@@ -142,7 +142,7 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/5">
         <motion.div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]"
+          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand-cyan to-brand-violet"
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ type: 'spring', stiffness: 100, damping: 20 }}
@@ -184,7 +184,7 @@ function StatusGlyph({ status }: { status: JobStatus }) {
     case 'processing':
     case 'uploading':
     case 'retrying':
-      return <span style={{ color: '#7C3AED' }} className="animate-spin inline-block">⟳</span>;
+      return <span style={{ color: '#06B6D4' }} className="animate-spin inline-block">⟳</span>;
     case 'failed':
       return <span style={{ color: '#EF4444' }}>✗</span>;
     default:
@@ -418,7 +418,7 @@ function ModalFooter({
 /* Confetti (subtle, framer-motion divs)                             */
 /* ------------------------------------------------------------------ */
 
-const CONFETTI_COLORS = ['#7C3AED', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899'];
+const CONFETTI_COLORS = ['#06B6D4', '#7C3BED', '#10B981', '#F59E0B', '#EF4444', '#EC4899'];
 
 function Confetti() {
   const particles = React.useMemo(

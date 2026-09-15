@@ -1,8 +1,5 @@
 'use client';
 
-/**
- * Layout compartido del dashboard — Shell futurista.
- */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -22,10 +19,10 @@ import { cn } from '@/utils';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: Home },
-  { href: '/content', label: 'Mi contenido', icon: LayoutGrid },
+  { href: '/content', label: 'Contenido', icon: LayoutGrid },
   { href: '/publications', label: 'Publicaciones', icon: Send },
-  { href: '/accounts', label: 'Cuentas y Redes', icon: Link2 },
-  { href: '/analytics', label: 'Analiticas', icon: BarChart3 },
+  { href: '/accounts', label: 'Cuentas', icon: Link2 },
+  { href: '/analytics', label: 'Analíticas', icon: BarChart3 },
 ] as const;
 
 const PROVIDER_META = [
@@ -42,6 +39,7 @@ interface AccountLite {
   is_valid: boolean;
   token_is_valid?: boolean;
 }
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -50,7 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/accounts')
+    void fetch('/api/accounts')
       .then((r) => r.json())
       .then((body: { accounts?: AccountLite[] }) => {
         if (!cancelled && Array.isArray(body.accounts)) setAccounts(body.accounts);
@@ -107,17 +105,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className={cn(
               'group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200',
               active
-                ? 'bg-gradient-to-r from-brand-purple/20 to-brand-cyan/10 text-white'
+                ? 'bg-gradient-to-r from-brand-cyan/20 to-brand-violet/10 text-white'
                 : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
             )}
           >
             {active && (
               <motion.span
                 layoutId="nav-active"
-                className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-gradient-to-b from-brand-purple to-brand-cyan"
+                className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-gradient-to-b from-brand-cyan to-brand-violet"
               />
             )}
-            <Icon size={17} className={cn(active ? 'text-brand-purple' : 'group-hover:text-brand-cyan')} />
+            <Icon size={17} className={cn(active ? 'text-brand-cyan' : 'group-hover:text-brand-violet')} />
             {item.label}
           </Link>
         );
@@ -166,7 +164,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-white/5 bg-ink-900/60 px-4 py-6 backdrop-blur-xl lg:flex">
           <div>
             <Link href="/" className="mb-8 flex items-center gap-2.5 px-1">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-purple to-brand-cyan text-xs font-black text-white shadow-glow-purple">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-cyan to-brand-violet text-xs font-black text-white shadow-glow-cyan">
                 CS
               </span>
               <span className="flex flex-col leading-tight">
@@ -177,7 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              className="mb-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-purple to-brand-cyan px-4 py-3 text-sm font-semibold text-white shadow-glow-purple transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="mb-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-violet px-4 py-3 text-sm font-semibold text-white shadow-glow-cyan transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
               <HardDriveUpload size={17} />
               Subir videos de tu PC
@@ -191,7 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <p className="px-2 font-mono text-[10px] text-muted-foreground/50">
-            v1.0 - IMPORTA - SELECCIONA - PUBLICA
+            v1.0 — IMPORTA · SELECCIONA · PUBLICA
           </p>
         </aside>
 
@@ -200,13 +198,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              aria-label="Abrir menu"
+              aria-label="Abrir menú"
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground"
             >
               <Menu size={18} />
             </button>
             <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-purple to-brand-cyan text-[10px] font-black text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-cyan to-brand-violet text-[10px] font-black text-white">
                 CS
               </span>
               <span className="text-sm font-bold tracking-wide text-white">COPYPASTE SOCIAL</span>
@@ -214,8 +212,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              aria-label="Subir videos desde tu PC"
-              className="ml-auto flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-purple to-brand-cyan px-3 text-xs font-semibold text-white shadow-glow-purple"
+              aria-label="Subir videos"
+              className="ml-auto flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-violet px-3 text-xs font-semibold text-white shadow-glow-cyan"
             >
               <HardDriveUpload size={14} />
               Subir
@@ -245,7 +243,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div>
                 <div className="mb-6 flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-purple to-brand-cyan text-[10px] font-black text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-cyan to-brand-violet text-[10px] font-black text-white">
                       CS
                     </span>
                     <span className="text-sm font-bold text-white">COPYPASTE SOCIAL</span>
@@ -253,23 +251,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <button
                     type="button"
                     onClick={() => setMenuOpen(false)}
-                    aria-label="Cerrar menu"
+                    aria-label="Cerrar menú"
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground"
                   >
                     <X size={16} />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setUploadOpen(true);
-                  }}
-                  className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-purple to-brand-cyan px-4 py-3 text-sm font-semibold text-white shadow-glow-purple"
-                >
-                  <HardDriveUpload size={16} />
-                  Subir videos de tu PC
-                </button>
                 {mobileNav}
                 <div className="mt-5 rounded-xl border border-white/5 bg-white/[0.02] p-3">
                   <p className="mb-2 px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -287,4 +274,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
-

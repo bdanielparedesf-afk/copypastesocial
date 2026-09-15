@@ -275,8 +275,13 @@ export default function ComposePage() {
         aiStatus: 'done',
       });
     } catch (e) {
+      // Mejor manejo de errores: no dejar aiStatus en estado inconsistente
+      // Los videos con error de IA siguen listos para publicar (con metadata manual)
+      const errorMsg = e instanceof Error ? e.message : 'Error al generar con IA';
       updateFile(f.localId, { aiStatus: 'error' });
-      toast.error(e instanceof Error ? e.message : 'Error al generar con IA');
+      // Mostrar error pero no bloquear el flujo - el video sigue disponible
+      console.warn(`[compose] IA falló para ${f.fileName}:`, errorMsg);
+      toast.warning(`IA: ${errorMsg} (puedes editar manualmente)`);
     }
   };
 
@@ -304,11 +309,19 @@ export default function ComposePage() {
       }
 
       // IA en secuencia (1 llamada por video: título + descripción + hashtags)
+      // Los videos que fallen en IA siguen estando disponibles para publicar
+      // (con título/descripción/hashtags manuales o reintentar después)
+      let aiSuccessCount = 0;
+      let aiErrorCount = 0;
       for (let i = 0; i < ready.length; i++) {
         const u = ready[i];
         const f = filesRef.current.find((x) => x.localId === u.localId);
-        if (f) await generateAI(f);
-        setPipeline({ stage: 'ai', message: `Generando IA ${i + 1}/${ready.length}...` });
+        if (f) {
+          await generateAI(f);
+          if (f.aiStatus === 'done') aiSuccessCount++;
+          else if (f.aiStatus === 'error') aiErrorCount++;
+        }
+        setPipeline({ stage: 'ai', message: `Generando IA ${i + 1}/${ready.length} (${aiSuccessCount} OK, ${aiErrorCount} errores)...` });
       }
 
       if (selected.size === 0) {
@@ -802,7 +815,7 @@ export default function ComposePage() {
                   ))}
                   <Button
                     size="sm"
-                    variant="glow"
+                    variant="default"
                     className="ml-auto"
                     disabled={uploading || files.length === 0}
                     onClick={() => void generateAllAI()}
@@ -974,7 +987,7 @@ export default function ComposePage() {
                     </div>
 
                     <Button
-                      variant="glow"
+                    variant="default"
                       size="lg"
                       className="w-full"
                       disabled={publishing || uploading || readyCount === 0 || selected.size === 0}

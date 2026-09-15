@@ -301,7 +301,7 @@ export default function AuditPage() {
                           <Button
                             onClick={handleDownload}
                             disabled={isDownloading || !!jobId}
-                            variant="glow"
+                            variant="default"
                             size="lg"
                             className="w-full"
                           >

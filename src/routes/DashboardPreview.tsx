@@ -2,11 +2,11 @@
 
 export default function DashboardPreview() {
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white p-6 md:p-8 font-sans selection:bg-[#7C3AED]/30">
+    <div className="min-h-screen bg-[#0A0A0B] text-white p-6 md:p-8 font-sans selection:bg-brand-cyan/30">
       {/* HEADER */}
       <header className="flex justify-between items-center mb-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center font-bold">C</div>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-cyan to-brand-violet flex items-center justify-center font-bold">C</div>
           <span className="font-semibold text-[17px]">Content Copier</span>
         </div>
         <nav className="hidden md:flex gap-8 text-[14px] text-zinc-400">

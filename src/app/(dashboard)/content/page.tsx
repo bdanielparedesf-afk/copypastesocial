@@ -806,7 +806,6 @@ function FilterBar({
 
 function SelectionBar({
   count,
-  onDeselectAll,
   onCopySelected,
   copying,
   accounts,
@@ -817,7 +816,6 @@ function SelectionBar({
   aiSelectedCount,
 }: {
   count: number;
-  onDeselectAll: () => void;
   onCopySelected: () => void;
   copying: boolean;
   accounts: Array<{ id: string; provider: ProviderId; username: string }>;
@@ -835,13 +833,13 @@ function SelectionBar({
       transition={{ type: 'spring', stiffness: 320, damping: 30 }}
       className="fixed bottom-6 left-1/2 z-50"
     >
-      <div className="glass-strong flex items-center gap-4 rounded-2xl border border-brand-purple/25 px-5 py-3 glow-purple">
+      <div className="glass-strong flex items-center gap-4 rounded-2xl border border-brand-cyan/25 px-5 py-3 glow-cyan">
         <div className="flex items-center gap-2">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 20 }}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-purple"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-cyan"
           >
             <CheckCheck size={13} className="text-white" />
           </motion.div>
@@ -894,13 +892,7 @@ function SelectionBar({
         )}
 
         {/* FASE 17 — IA Masiva */}
-        <Button
-          variant="glow"
-          size="sm"
-          onClick={onBulkAi}
-          disabled={bulkAiGenerating}
-          className="bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]"
-        >
+        <Button variant="default" size="sm" onClick={onBulkAi} disabled={bulkAiGenerating} className="bg-gradient-to-r from-brand-cyan to-brand-violet">
           {bulkAiGenerating ? (
             <>
               <Spinner size={13} />
@@ -917,12 +909,8 @@ function SelectionBar({
           )}
         </Button>
 
-        <Button variant="ghost" size="sm" onClick={onDeselectAll}>
-          Deseleccionar
-        </Button>
-
         <Button
-          variant="glow"
+          variant="default"
           size="sm"
           onClick={onCopySelected}
           disabled={copying || selectedAccounts.length === 0}
@@ -1185,7 +1173,7 @@ function PreviewModal({
                  <TabsTrigger
                    value="original"
                    className={cn(
-                     'data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#7C3AED] data-[state=active]:to-[#06B6D4]'
+                    'data-[state=active]:bg-gradient-to-r data-[state=active]:from-brand-cyan data-[state=active]:to-brand-violet'
                    )}
                    data-state={aiTab === 'original' ? 'active' : 'inactive'}
                  >
@@ -1194,7 +1182,7 @@ function PreviewModal({
                  <TabsTrigger
                    value="generate"
                    className={cn(
-                     'data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#7C3AED] data-[state=active]:to-[#06B6D4]'
+                    'data-[state=active]:bg-gradient-to-r data-[state=active]:from-brand-cyan data-[state=active]:to-brand-violet'
                    )}
                    data-state={aiTab === 'generate' ? 'active' : 'inactive'}
                  >
@@ -1205,7 +1193,7 @@ function PreviewModal({
                {/* Tab: Original caption */}
                <TabsContent value="original" className="mt-0">
                  {item.useAi && item.aiGeneratedCaption && (
-                   <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-brand-purple/30 bg-brand-purple/10 px-3 py-2 text-xs text-brand-purple">
+                    <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-brand-cyan/30 bg-brand-cyan/10 px-3 py-2 text-xs text-brand-cyan">
                      <Sparkles size={12} />
                      <span>Usando caption IA (activo)</span>
                    </div>
@@ -1235,7 +1223,7 @@ function PreviewModal({
                          className={cn(
                            'flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200',
                            aiPlatform === p.id
-                             ? 'border-brand-purple bg-brand-purple/15 text-white shadow-lg shadow-brand-purple/25'
+                             ?                             'border-brand-cyan bg-brand-cyan/15 text-white shadow-lg shadow-brand-cyan/25'
                              : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
                          )}
                        >
@@ -1259,7 +1247,7 @@ function PreviewModal({
                          className={cn(
                            'rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200',
                            aiTone === t.id
-                             ? 'border-brand-purple bg-brand-purple/15 text-white shadow-lg shadow-brand-purple/25'
+                             ?                             'border-brand-cyan bg-brand-cyan/15 text-white shadow-lg shadow-brand-cyan/25'
                              : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
                          )}
                        >
@@ -1269,11 +1257,11 @@ function PreviewModal({
                    </div>
                  </div>
 
-                 {/* Generate button: gradient #7C3AED → #06B6D4 con spinner */}
+                  {/* Generate button: gradient cyan → violet con spinner */}
                  <Button
                    onClick={handleGenerateAi}
                    disabled={aiGenerating}
-                   className="w-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white shadow-lg shadow-brand-purple/25"
+                    className="w-full bg-gradient-to-r from-brand-cyan to-brand-violet text-white shadow-lg shadow-brand-cyan/25"
                  >
                    {aiGenerating ? (
                      <>
@@ -1292,19 +1280,19 @@ function PreviewModal({
                    <p className="text-xs text-red-400">{aiError}</p>
                  )}
 
-                 {/* Result card: glass bg-[#151517] border-[#262629] */}
-                 {aiGeneratedCaption && (
-                   <div className="rounded-2xl border border-[#262629] bg-[#151517] p-4 space-y-3">
-                     <p className="whitespace-pre-line text-sm leading-relaxed text-white/90">
-                       {aiGeneratedCaption}
-                     </p>
-                     <div className="flex gap-2">
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={handleCopyAiCaption}
-                         className="border-[#262629] bg-[#1F1F22] hover:bg-[#2A2A2E]"
-                       >
+                  {/* Result card: glass card bg */}
+                  {aiGeneratedCaption && (
+                    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+                        {aiGeneratedCaption}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyAiCaption}
+                          className="border-border"
+                        >
                          {aiCopied ? (
                            <>
                              <Check size={13} />
@@ -1322,7 +1310,7 @@ function PreviewModal({
                          onClick={handleUseAiCaption}
                          disabled={aiUseClicked}
                          className={cn(
-                           'bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]',
+                            'bg-gradient-to-r from-brand-cyan to-brand-violet',
                            aiUseClicked && 'opacity-60'
                          )}
                        >
@@ -1410,33 +1398,11 @@ function PreviewModal({
               ) : (
                 <>
                   <Copy size={14} />
-                  Copiar Link
+                  Copiar link
                 </>
               )}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(item.source?.originalUrl ?? item.url);
-                  setLinkCopied(true);
-                  setTimeout(() => setLinkCopied(false), 2000);
-                } catch {
-                  // clipboard no disponible
-                }
-              }}
-            >
-              <ClipboardPaste size={14} />
-              Fotocopiar este
-            </Button>
-            <Button
-              variant={itemSelected ? 'outline' : 'secondary'}
-              size="sm"
-              className="flex-1"
-              onClick={() => onToggleSelect(item.id)}
-            >
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => onToggleSelect(item.id)}>
               {itemSelected ? (
                 <>
                   <Check size={14} />
@@ -1445,19 +1411,11 @@ function PreviewModal({
               ) : (
                 <>
                   <LayoutGrid size={14} />
-                  Seleccionar
+                  Añadir a selección
                 </>
               )}
             </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={() => {
-                setDeleting(true);
-                onDelete(item.id);
-              }}
-            >
+            <Button variant="destructive" size="sm" disabled={deleting} onClick={() => { setDeleting(true); onDelete(item.id); }}>
               {deleting ? <Spinner size={14} /> : <Trash2 size={14} />}
               Eliminar
             </Button>
@@ -1478,8 +1436,8 @@ function BentoIllustration() {
     <svg width="180" height="120" viewBox="0 0 180 120" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="bento-glow" x1="0" y1="0" x2="180" y2="120">
-          <stop stopColor="#7C3AED" stopOpacity="0.9" />
-          <stop offset="1" stopColor="#06B6D4" stopOpacity="0.7" />
+          <stop stopColor="#06B6D4" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#7C3BED" stopOpacity="0.7" />
         </linearGradient>
         <linearGradient id="bento-fill" x1="0" y1="0" x2="0" y2="1">
           <stop stopColor="#1F1F22" />
@@ -1524,7 +1482,7 @@ function EmptyState() {
         Pega una URL en el Dashboard para comenzar a importar contenido social.
       </p>
       <Link href="/" className="mt-6">
-        <Button variant="glow" size="lg">
+        <Button variant="default" size="lg">
           <Plus size={16} />
           Pega una URL en el Dashboard
         </Button>
@@ -1922,13 +1880,6 @@ export default function ContentPage() {
       }
       return next;
     });
-  }, [pub]);
-
-  const deselectAll = useCallback(() => {
-    setSelectedIds(new Set());
-    pub.setSelectedMedia([]);
-    pub.setSelectedAccounts([]);
-    setUseAiIds(new Set());
   }, [pub]);
 
    /* FASE 14 — Fotocopiar: publicar en cuentas seleccionadas */
@@ -2349,7 +2300,6 @@ const copySelected = useCallback(async () => {
         {selectedIds.size > 0 && (
           <SelectionBar
             count={selectedIds.size}
-            onDeselectAll={deselectAll}
             onCopySelected={copySelected}
             copying={publishing}
             accounts={accounts}

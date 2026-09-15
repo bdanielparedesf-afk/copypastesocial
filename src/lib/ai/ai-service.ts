@@ -385,8 +385,39 @@ export function createAIService(): AIService {
       }
       const media = parseFrames(frames);
       const prompt = buildPackPrompt(context, platform, media.length);
-      const raw = await callLLM(prompt, 4096, media);
-      return parsePack(raw, context, platform);
+      // Reintentos más agresivos para errores transitorios (503 high demand)
+      // y fallback a mock si todo falla (nunca dejar vacío)
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const raw = await callLLM(prompt, 4096, media);
+          return parsePack(raw, context, platform);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '';
+          // Si es error transitorio (503, 429, 5xx), reintenta con backoff
+          if (msg.includes('503') || msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('504')) {
+            console.warn(`[ai-service] generatePack intento ${attempt + 1}/5 falló (transitorio):`, msg.slice(0, 100));
+            if (attempt < 4) {
+              await sleep(attempt === 0 ? 2000 : attempt === 1 ? 4000 : 8000);
+              continue;
+            }
+          }
+          // Si tenemos OpenAI, intenta con él como fallback
+          if (process.env.OPENAI_API_KEY && !msg.includes('OPENAI_API_KEY')) {
+            console.error('[ai-service] Gemini falló, intentando OpenAI como fallback:', msg.slice(0, 100));
+            try {
+              const raw = await callOpenAI(prompt, 4096, media);
+              return parsePack(raw, context, platform);
+            } catch (oe) {
+              console.error('[ai-service] OpenAI también falló:', oe);
+            }
+          }
+          // Último recurso: mock (nunca dejar vacío)
+          console.warn(`[ai-service] generatePack usando fallback MOCK tras ${attempt + 1} intentos`);
+          return getMockPack(context, platform);
+        }
+      }
+      // Should never reach here, but just in case:
+      return getMockPack(context, platform);
     },
   };
 }
