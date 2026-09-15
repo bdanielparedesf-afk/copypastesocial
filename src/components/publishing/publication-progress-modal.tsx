@@ -567,27 +567,33 @@ export function PublicationProgressModal({
 
     const fetchJobs = async () => {
       try {
-        const { data, error } = await supabase
-          .from('publication_jobs')
-          .select('*, media_items(title), social_accounts(provider)')
-          .eq('publication_id', publicationId);
-
-        if (cancelled || error || !data) return;
-
-        const mapped: PublicationJob[] = data.map((j: any) => {
-          const media = Array.isArray(j.media_items) ? j.media_items[0] : j.media_items;
-          const account = Array.isArray(j.social_accounts)
-            ? j.social_accounts[0]
-            : j.social_accounts;
-          return {
-            id: j.id,
-            mediaTitle: media?.title ?? 'Video',
-            provider: (account?.provider as ProviderId) ?? 'instagram',
-            status: mapJobStatus(j.status),
-            externalId: j.external_id ?? null,
-            error: j.error_message ?? null,
-          };
+        // Vía API (service-role): el cliente del navegador es anon y RLS
+        // bloquearía publication_jobs/media_items; además media_items no
+        // tiene columna title (el título vive en metadata).
+        const res = await fetch(`/api/publications/${publicationId}/jobs`, {
+          cache: 'no-store',
         });
+        if (cancelled || !res.ok) return;
+        const body = (await res.json()) as {
+          jobs?: Array<{
+            id: string;
+            mediaTitle?: string;
+            provider?: ProviderId;
+            status?: string;
+            externalId?: string | null;
+            error?: string | null;
+          }>;
+        };
+        if (!Array.isArray(body.jobs)) return;
+
+        const mapped: PublicationJob[] = body.jobs.map((j) => ({
+          id: j.id,
+          mediaTitle: j.mediaTitle ?? 'Video',
+          provider: j.provider ?? 'instagram',
+          status: mapJobStatus(j.status),
+          externalId: j.externalId ?? null,
+          error: j.error ?? null,
+        }));
 
         setInternalJobs(mapped);
         setInternalTotal(mapped.length);
@@ -596,7 +602,12 @@ export function PublicationProgressModal({
       }
     };
 
-    /* Canal realtime */
+    /* Polling cada 2s (el realtime con cliente anon puede estar bloqueado
+       por RLS; el polling no depende de la suscripción). */
+    pollRef.current = setInterval(fetchJobs, 2000);
+
+    /* Canal realtime (best-effort: acelera la actualización si RLS lo
+       permite). */
     realtimeRef.current = supabase
       .channel(`publication-progress-${publicationId}`)
       .on(
@@ -611,12 +622,7 @@ export function PublicationProgressModal({
           fetchJobs();
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          /* polling de fallback cada 2s */
-          pollRef.current = setInterval(fetchJobs, 2000);
-        }
-      });
+      .subscribe();
 
     /* Llamada inicial inmediata */
     fetchJobs();
@@ -721,6 +727,7 @@ function mapJobStatus(status: string | undefined | null): JobStatus {
     case 'pending':
       return 'pending';
     case 'processing':
+    case 'running':
       return 'processing';
     case 'uploading':
       return 'uploading';

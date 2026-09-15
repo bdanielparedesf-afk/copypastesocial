@@ -344,30 +344,39 @@ export async function processQueue(): Promise<number> {
   const admin = createServerClient();
   const now = new Date().toISOString();
 
-  // FASE 19: Auto-retry — cambiar jobs RETRYING con next_attempt <= now() a PENDING
-  const { error: retryUpdateError } = await admin
-    .from('publication_jobs')
-    .update({ status: 'pending' })
-    .eq('status', 'retrying')
-    .not('next_attempt', 'is', null)
-    .lte('next_attempt', now);
-
-  if (retryUpdateError) throw retryUpdateError;
-
-  // FASE 18: Buscar jobs PENDING (incluye los recién promovidos de RETRYING)
-  // FASE 20: Rate limit — máx 100 jobs por ejecución cron
+  // La BD no tiene la columna next_attempt (vive en payload) ni el estado
+  // 'retrying' (CHECK: pending | running | completed | failed). Los jobs
+  // PENDING con next_attempt futuro (p.ej. cuota YouTube) se saltan aquí y
+  // el próximo cron los tomará cuando la hora llegue.
   const { data: pendingData, error: pendingError } = await admin
     .from('publication_jobs')
-    .select('id')
+    .select('id, publication_id, payload')
     .eq('status', 'pending')
     .limit(100);
 
   if (pendingError) throw pendingError;
 
-  const allJobs = pendingData ?? [];
+  const allJobs = (pendingData ?? []).filter((j) => {
+    const nextAttempt = (j.payload as Record<string, unknown> | null)?.next_attempt;
+    return !nextAttempt || String(nextAttempt) <= now;
+  });
+
+  // Programadas: los jobs de publicaciones con scheduled_at futuro no se
+  // tocan hasta que llegue la hora (la fecha vive en publications).
+  const pubIds = [...new Set(allJobs.map((j) => String(j.publication_id)))];
+  const scheduledPubIds = new Set<string>();
+  if (pubIds.length > 0) {
+    const { data: pubs } = await admin
+      .from('publications')
+      .select('id, scheduled_at')
+      .in('id', pubIds)
+      .gt('scheduled_at', now);
+    for (const p of pubs ?? []) scheduledPubIds.add(String(p.id));
+  }
+  const jobs = allJobs.filter((j) => !scheduledPubIds.has(String(j.publication_id)));
 
   let processed = 0;
-  for (const job of allJobs) {
+  for (const job of jobs) {
     try {
       await processJob(job.id);
       processed += 1;

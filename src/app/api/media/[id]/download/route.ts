@@ -9,42 +9,33 @@
  * puedan descargar el archivo desde una URL accesible.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // 1) Auth
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Single-owner: sin login propio; el endpoint se sirve por UUID sin sesión.
+  // Service-role: con el cliente anon RLS bloquea el SELECT y devolvía 401/404
+  // siempre, rompiendo el publish de los providers que descargan desde aquí.
+  const supabase = createServerClient();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  // 2) Validación UUID
+  // 1) Validación UUID
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'id debe ser un UUID válido' }, { status: 400 });
   }
 
-  // 3) Cargar el item y validar ownership
+  // 2) Cargar el item
   const { data: item, error } = await supabase
     .from('media_items')
-    .select('*, sources!inner(user_id)')
+    .select('*')
     .eq('id', id)
     .single();
 
-  const sources = item?.sources as unknown;
-  const sourceOwner = Array.isArray(sources)
-    ? (sources[0] as { user_id?: string } | undefined)?.user_id
-    : (sources as { user_id?: string } | undefined)?.user_id;
-
-  if (error || !item || sourceOwner !== user.id) {
+  if (error || !item) {
     return NextResponse.json(
-      { error: 'media_item no encontrado o sin permisos' },
+      { error: 'media_item no encontrado' },
       { status: 404 }
     );
   }

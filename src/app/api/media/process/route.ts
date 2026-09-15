@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 import { processMediaItem } from '@/lib/media/processor';
 import { getUserIdAllowDev } from '@/lib/dev-auth';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +23,9 @@ const BodySchema = z.object({
 export async function POST(request: Request) {
   // 1) Auth — single-owner: nunca 401 (la app no tiene login propio).
   const userId = await getUserIdAllowDev(request);
+  // Service-role: la consulta de ownership con cliente anon puede fallar por
+  // RLS (media_items/sources) y devolver 404 aunque el item exista.
+  const supabase = createServerClient();
 
   // 2) Body + validación UUID
   let body: unknown;

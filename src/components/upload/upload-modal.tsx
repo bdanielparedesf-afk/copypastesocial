@@ -25,6 +25,34 @@ const MAX_FILES = 50;
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB por archivo
 const MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024; // 5GB por tanda
 
+/** Extensiones de video aceptadas (fallback cuando File.type viene vacío en Windows). */
+const VIDEO_EXTS = [
+  'mp4',
+  'webm',
+  'mov',
+  'mkv',
+  'avi',
+  'm4v',
+  '3gp',
+  '3g2',
+  'ogv',
+  'mts',
+  'm2ts',
+  'flv',
+  'wmv',
+  'mpg',
+  'mpeg',
+];
+
+function isVideoFile(f: File): boolean {
+  if (f.type && f.type.toLowerCase().startsWith('video/')) return true;
+  const ext = f.name.split('.').pop()?.toLowerCase().split('?')[0] ?? '';
+  return VIDEO_EXTS.includes(ext);
+}
+
+const ACCEPT_ATTR =
+  'video/*,.mp4,.webm,.mov,.mkv,.avi,.m4v,.3gp,.3g2,.ogv,.mts,.m2ts,.flv,.wmv,.mpg,.mpeg';
+
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
@@ -39,12 +67,26 @@ function formatSize(bytes: number): string {
 
 export default function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ imported: number; jobs: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Índice del video que se está previsualizando antes de subir.
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // URLs locales (URL.createObjectURL) para ver cada video antes de subirlo.
+  // Se regeneran cada vez que cambia la lista de archivos.
+  useEffect(() => {
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    setPreviewIndex((prev) => (prev !== null && prev >= files.length ? null : prev));
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [files]);
 
   useEffect(() => {
     if (!open) {
@@ -53,6 +95,7 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
       setResult(null);
       setError(null);
       setIsDragOver(false);
+      setPreviewIndex(null);
     }
   }, [open]);
 
@@ -72,7 +115,9 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
   const addFiles = useCallback((incoming: FileList | File[]) => {
     setError(null);
     const list = Array.from(incoming);
-    const videos = list.filter((f) => f.type.startsWith('video/'));
+    // En Windows algunos videos (.mov/.mkv/.avi) llegan con File.type === '',
+    // así que se acepta también por extensión para no bloquear videos válidos.
+    const videos = list.filter(isVideoFile);
     const rejected = list.length - videos.length;
     setFiles((prev) => {
       const room = MAX_FILES - prev.length;
@@ -98,6 +143,7 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviewIndex((prev) => (prev === index ? null : prev !== null && prev > index ? prev - 1 : prev));
   }, []);
 
   const handleUpload = useCallback(() => {
@@ -250,12 +296,12 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                     {isDragOver ? 'Suéltalos aquí!' : 'Arrastra tus videos aquí o haz clic para elegir'}
                   </p>
                   <p className="font-mono text-[11px] text-muted-foreground">
-                    MP4 - WEBM - MOV — máx 100MB por video - {MAX_FILES} por tanda
+                    MP4 - WEBM - MOV - MKV - AVI — máx 1GB por video - {MAX_FILES} por tanda
                   </p>
                   <input
                     ref={inputRef}
                     type="file"
-                    accept="video/*"
+                    accept={ACCEPT_ATTR}
                     multiple
                     className="hidden"
                     onChange={(e) => {
@@ -266,7 +312,7 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                 </div>
 
                 {files.length > 0 && (
-                  <div className="relative mt-4 max-h-40 space-y-2 overflow-y-auto pr-1">
+                  <div className="relative mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
                     <AnimatePresence initial={false}>
                       {files.map((file, index) => (
                         <motion.div
@@ -276,7 +322,29 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                           exit={{ opacity: 0, x: 12 }}
                           className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
                         >
-                          <Film size={15} className="shrink-0 text-brand-purple" />
+                          {/* Miniatura del video local: clic para verlo antes de subir */}
+                          {previews[index] ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewIndex(index)}
+                              title="Ver video antes de subir"
+                              className="relative h-12 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-black"
+                            >
+                              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                              <video
+                                src={previews[index]}
+                                preload="metadata"
+                                muted
+                                playsInline
+                                className="h-full w-full object-cover"
+                              />
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-[10px] font-semibold text-white">
+                                ▶ Ver
+                              </span>
+                            </button>
+                          ) : (
+                            <Film size={15} className="shrink-0 text-brand-purple" />
+                          )}
                           <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                             {file.name}
                           </span>
@@ -296,6 +364,38 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
                         </motion.div>
                       ))}
                     </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Vista previa del video seleccionado (antes de subir) */}
+                {previewIndex !== null && files[previewIndex] && previews[previewIndex] && (
+                  <div
+                    className="relative mt-4 overflow-hidden rounded-xl border border-brand-purple/40 bg-black"
+                    role="dialog"
+                    aria-label={`Vista previa de ${files[previewIndex].name}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-black/60 px-3 py-2">
+                      <span className="min-w-0 flex-1 truncate text-xs text-white">
+                        {files[previewIndex].name} — {formatSize(files[previewIndex].size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewIndex(null)}
+                        aria-label="Cerrar vista previa"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 text-white/70 transition-colors hover:text-white"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <video
+                      key={previews[previewIndex]}
+                      src={previews[previewIndex]}
+                      controls
+                      playsInline
+                      preload="auto"
+                      className="max-h-64 w-full bg-black object-contain"
+                    />
                   </div>
                 )}
 

@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@/components/ui';
 import { uploadFilesDirect } from '@/lib/upload/direct-upload';
+import { extractVideoFrames } from '@/lib/media/frames';
 import { cn } from '@/utils';
 
 type Platform = 'instagram' | 'youtube' | 'facebook' | 'tiktok';
@@ -42,6 +43,8 @@ interface ComposerFile {
   description: string;
   hashtagsText: string;
   aiStatus: 'idle' | 'loading' | 'done' | 'error';
+  /** Fotogramas capturados del video (contexto visual real para la IA). */
+  frames?: string[];
 }
 
 interface SocialAccount {
@@ -142,6 +145,15 @@ export default function ComposePage() {
   const updateFile = (localId: string, patch: Partial<ComposerFile>) =>
     setFiles((prev) => prev.map((f) => (f.localId === localId ? { ...f, ...patch } : f)));
 
+  // Extrae fotogramas de cada video (best-effort, en el navegador) para que
+  // la IA genere título/descripción/hashtags coherentes con el CONTENIDO real.
+  const attachFrames = async (items: ComposerFile[], vids: File[]) => {
+    for (let i = 0; i < vids.length; i++) {
+      const frames = await extractVideoFrames(vids[i]).catch(() => []);
+      if (frames.length > 0) updateFile(items[i].localId, { frames });
+    }
+  };
+
   const addFiles = (list: FileList | File[] | null) => {
     const vids = Array.from(list ?? []).filter((f) => f.type.startsWith('video/'));
     if (vids.length === 0) {
@@ -162,6 +174,8 @@ export default function ComposePage() {
       aiStatus: 'idle',
     }));
     setFiles((prev) => [...prev, ...items]);
+    // Los frames llegan async (no bloquean la subida); generateAI los usa si ya están.
+    void attachFrames(items, vids);
     if (autoMode) {
       void runAutoPipeline(vids, items);
     } else {
@@ -245,6 +259,7 @@ export default function ComposePage() {
           action: 'pack',
           platform,
           context: prettyName(f.fileName),
+          frames: f.frames,
         }),
       });
       const body = (await res.json()) as {

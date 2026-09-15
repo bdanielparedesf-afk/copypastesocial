@@ -84,6 +84,15 @@ export async function requestUploadTargets(files: File[]): Promise<UploadTarget[
 /**
  * 2) Sube el archivo a su signedUrl con PUT (XHR para tener progreso real).
  * El token de la URL firmada es la autorización: no se envían credenciales.
+ *
+ * IMPORTANTE (fix error de subida): la URL firmada de Supabase
+ * (`/object/upload/sign/...?token=...`) espera `multipart/form-data`
+ * (igual que `uploadToSignedUrl()` del SDK), NO el binario crudo.
+ * Enviar el File directo + `Content-Type` manual hace que Storage responda
+ * 400/Bad Request. Aquí se replica el comportamiento del SDK:
+ * FormData con el archivo y SIN fijar `Content-Type` (el navegador pone el
+ * boundary). Además se infiere el MIME por extensión cuando Windows reporta
+ * `File.type === ''`, porque el bucket `raw` solo acepta video/image/audio.
  */
 export function uploadFileToSignedUrl(
   file: File,
@@ -91,9 +100,20 @@ export function uploadFileToSignedUrl(
   onProgress?: (loaded: number, total: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const effectiveType = file.type || guessVideoMime(file.name) || 'video/mp4';
+    const uploadBlob: File =
+      file.type && file.type.toLowerCase().startsWith('video/')
+        ? file
+        : new File([file], file.name, { type: effectiveType });
+
+    const form = new FormData();
+    form.append('cacheControl', '3600');
+    // Clave "" como hace el SDK (body.append("", fileBody)).
+    form.append('', uploadBlob, uploadBlob.name);
+
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', target.signedUrl);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    // NO fijar Content-Type: rompería el boundary del multipart.
     xhr.setRequestHeader('x-upsert', 'true');
 
     xhr.upload.onprogress = (e) => {
@@ -119,8 +139,44 @@ export function uploadFileToSignedUrl(
     xhr.onabort = () => reject(new Error(`Subida cancelada: ${file.name}`));
 
     // El binario va directo al Storage (nunca por las API routes).
-    xhr.send(file);
+    xhr.send(form);
   });
+}
+
+/** Infiere un MIME de video por extensión (Windows a veces reporta type ''). */
+function guessVideoMime(name: string): string | null {
+  const ext = name.split('.').pop()?.toLowerCase().split('?')[0] ?? '';
+  switch (ext) {
+    case 'mp4':
+    case 'm4v':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'mov':
+      return 'video/quicktime';
+    case 'mkv':
+      return 'video/x-matroska';
+    case 'avi':
+      return 'video/x-msvideo';
+    case 'ogv':
+      return 'video/ogg';
+    case '3gp':
+      return 'video/3gpp';
+    case '3g2':
+      return 'video/3gpp2';
+    case 'flv':
+      return 'video/x-flv';
+    case 'wmv':
+      return 'video/x-ms-wmv';
+    case 'mpg':
+    case 'mpeg':
+      return 'video/mpeg';
+    case 'mts':
+    case 'm2ts':
+      return 'video/mp2t';
+    default:
+      return null;
+  }
 }
 
 /** 3) Confirma la subida: crea source/publication/media_items (+ jobs). */

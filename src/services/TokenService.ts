@@ -1,6 +1,6 @@
 import { config } from '@/config';
 import { AppError, errorFactory } from '@/utils/errors';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 import { encrypt, decrypt } from './crypto';
 import type { SocialAccount, ProviderId } from '@/types';
 
@@ -199,7 +199,10 @@ export class TokenService {
     account: SocialAccount,
     updates: { accessToken: string; refreshToken: string; expiresAt: string | null }
   ): Promise<SocialAccount> {
-    const { data, error } = await supabase
+    // Service-role: la app es single-owner sin sesión y RLS bloquearía el
+    // UPDATE de social_accounts con el cliente anon.
+    const admin = createServerClient();
+    const { data, error } = await admin
       .from('social_accounts')
       .update({
         access_token: this.encrypt(updates.accessToken),
@@ -284,7 +287,8 @@ export class TokenService {
       }
     }
 
-    const { error } = await supabase
+    const admin = createServerClient();
+    const { error } = await admin
       .from('social_accounts')
       .update({ is_valid: false, updated_at: new Date().toISOString() })
       .eq('id', account.id);

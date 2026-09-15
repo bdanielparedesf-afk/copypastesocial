@@ -25,9 +25,9 @@ interface RawMediaItem {
   height: number | null;
   published_at: string | null;
   metadata: Record<string, unknown>;
-  ai_generated_caption: string | null;
-  ai_generated_title: string | null;
-  ai_generated_hashtags: string[] | null;
+  ai_generated_caption?: string | null;
+  ai_generated_title?: string | null;
+  ai_generated_hashtags?: string[] | null;
   created_at: string;
   sources: {
     id: string;
@@ -46,39 +46,47 @@ export async function GET() {
     const userId = await resolveUserId();
     if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data, error } = await db
+    const baseColumns = [
+      'id',
+      'source_id',
+      'url',
+      'source_url',
+      'external_id',
+      'content_hash',
+      'thumbnail_url',
+      'type',
+      'duration',
+      'width',
+      'height',
+      'published_at',
+      'metadata',
+      'created_at',
+    ].join(', ');
+    const aiColumns = 'ai_generated_caption, ai_generated_title, ai_generated_hashtags';
+    const embed =
+      'sources!inner ( id, original_url, provider, identifier, content_type, status, created_at )';
+
+    // La BD remota puede no tener las columnas ai_generated_* (FASE 17 sin
+    // migrar): primer intento completo; si la BD no conoce las columnas,
+    // reintenta sin ellas para que la libreria siga funcionando.
+    let queryResult = await db
       .from('media_items')
-       .select(
-        `id,
-         source_id,
-         url,
-         source_url,
-         external_id,
-         content_hash,
-         thumbnail_url,
-         type,
-         duration,
-         width,
-         height,
-         published_at,
-         metadata,
-         ai_generated_caption,
-         ai_generated_title,
-         ai_generated_hashtags,
-         created_at,
-         sources!inner (
-           id,
-           original_url,
-           provider,
-           identifier,
-           content_type,
-           status,
-           created_at
-         )`
-       )
-       .eq('sources.user_id', userId)
-       .order('created_at', { ascending: false })
-       .limit(500);
+      .select(`${baseColumns}, ${aiColumns}, ${embed}`)
+      .eq('sources.user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (queryResult.error && /ai_generated/i.test(queryResult.error.message ?? '')) {
+      const fallback = await db
+        .from('media_items')
+        .select(`${baseColumns}, ${embed}`)
+        .eq('sources.user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      queryResult = fallback as typeof queryResult;
+    }
+
+    const { data, error } = queryResult;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

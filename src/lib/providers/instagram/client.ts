@@ -92,3 +92,18 @@ export async function graphRequest<T>(
 
   return data;
 }
+
+/**
+ * Publicación a Instagram Reels: aún sin implementación en este cliente
+ * (el flujo legacy vive en src/lib/publishing/publisher.ts). Si un job con
+ * cuenta real de IG llega a processJob, falla con mensaje claro en vez de
+ * romper con "provider.upload is not a function".
+ */
+export async function upload(_params: unknown): Promise<{ external_id: string }> {
+  if (process.env.MOCK_MODE === 'true') return { external_id: `mock_ig_${Date.now()}` };
+  throw new Error('PUBLICACION_A_INSTAGRAM_NO_IMPLEMENTADA_AUN');
+}
+
+export async function getStatus(id: string) {
+  return { status: 'SUCCESS', external_id: id };
+}

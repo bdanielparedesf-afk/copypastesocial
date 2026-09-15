@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { createPublication } from '@/lib/publishing/publication.service';
 
 export async function POST(req: NextRequest) {
   const { media_ids, account_ids, use_ai_captions } = await req.json();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  // Single-owner: la app no tiene login propio; sin esto la ruta devuelve
+  // siempre 401 y el botón "Publicar" nunca funciona (ni en dev ni en Vercel).
+  const userId = await getUserIdAllowDev(req);
 
   const result = await createPublication({
-    user_id: user.id,
+    user_id: userId,
     media_ids,
     account_ids,
     use_ai_captions: use_ai_captions ?? null,
@@ -20,11 +19,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  // Service-role: publications/publication_jobs se leen por user_id explícito.
+  const supabase = createServerClient();
+  const userId = await getUserIdAllowDev();
 
   const { data: publications, error } = await supabase
     .from('publications')
@@ -35,7 +32,7 @@ export async function GET() {
       updated_at,
       publication_jobs ( id, status )
     `)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -46,8 +43,9 @@ export async function GET() {
   const mapped = (publications ?? []).map((p: any) => {
     const jobs = p.publication_jobs ?? [];
     const total = jobs.length;
-    const succeeded = jobs.filter((j: any) => j.status === 'SUCCESS' || j.status === 'COMPLETED').length;
-    const failed = jobs.filter((j: any) => j.status === 'FAILED').length;
+    // Estados reales en BD (CHECK): pending | running | completed | failed.
+    const succeeded = jobs.filter((j: any) => j.status === 'completed').length;
+    const failed = jobs.filter((j: any) => j.status === 'failed').length;
     return {
       id: p.id,
       status: p.status,

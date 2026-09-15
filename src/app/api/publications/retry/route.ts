@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 import { processQueue } from '@/lib/publishing/queue';
 
 export async function POST(req: NextRequest) {
   const { failed_ids } = await req.json();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  // Single-owner: sin login propio; user anónimo compartido.
+  const userId = await getUserIdAllowDev(req);
+  const supabase = createServerClient();
 
   if (!Array.isArray(failed_ids) || failed_ids.length === 0) {
     return NextResponse.json({ error: 'failed_ids is required' }, { status: 400 });
@@ -28,19 +27,19 @@ export async function POST(req: NextRequest) {
     .from('publications')
     .select('id')
     .in('id', publicationIds)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (pubError || !pubs || pubs.length !== publicationIds.length) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
+  // La tabla solo soporta: pending | running | completed | failed y no tiene
+  // error_message ni updated_at (esos datos viven en payload).
   const { error: resetError } = await supabase
     .from('publication_jobs')
     .update({
-      status: 'PENDING',
-      error_message: null,
+      status: 'pending',
       attempts: 0,
-      updated_at: new Date().toISOString(),
     })
     .in('id', failed_ids);
 

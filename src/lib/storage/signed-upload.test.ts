@@ -16,6 +16,8 @@ const {
   validateUploadFiles,
   sanitizeFileName,
   isOwnedStoragePath,
+  isVideoFile,
+  hasVideoExtension,
   buildSchemaMessage,
   buildDbErrorHint,
   MAX_FILES_PER_BATCH,
@@ -79,6 +81,29 @@ describe('validateUploadFiles', () => {
       expect(result.files[0].size).toBe(12 * 1024 * 1024);
       expect(result.files[0].type).toBe('video/mp4');
     }
+  });
+
+  it('acepta videos con type vacío si la extensión es de video (Windows)', () => {
+    const result = validateUploadFiles([{ name: 'clip.mov', size: 1024, type: '' }]);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.files[0].name).toBe('clip.mov');
+  });
+});
+
+describe('isVideoFile / hasVideoExtension', () => {
+  it('acepta por MIME video aunque la extensión sea rara', () => {
+    expect(isVideoFile('sin-extension', 'video/mp4')).toBe(true);
+  });
+
+  it('acepta por extensión cuando el type viene vacío (Windows)', () => {
+    expect(hasVideoExtension('clip.MOV')).toBe(true);
+    expect(isVideoFile('clip.mov', '')).toBe(true);
+    expect(isVideoFile('pelicula.mkv', '')).toBe(true);
+  });
+
+  it('rechaza extensiones que no son video', () => {
+    expect(isVideoFile('doc.pdf', '')).toBe(false);
+    expect(isVideoFile('foto.png', 'image/png')).toBe(false);
   });
 });
 

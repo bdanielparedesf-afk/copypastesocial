@@ -55,6 +55,41 @@ export type UploadValidation =
   | { ok: true; files: UploadFileInput[] }
   | { ok: false; error: string; status: number };
 
+/**
+ * Archivos de video aceptados por extensión (fallback cuando el navegador
+ * reporta `File.type === ''`, muy común en Windows con .mov/.mkv/.avi/.m2ts).
+ * Se usa tanto en cliente como en servidor para no rechazar videos válidos.
+ */
+export const VIDEO_EXTENSIONS = [
+  'mp4',
+  'webm',
+  'mov',
+  'mkv',
+  'avi',
+  'm4v',
+  '3gp',
+  '3g2',
+  'ogv',
+  'mts',
+  'm2ts',
+  'flv',
+  'wmv',
+  'mpg',
+  'mpeg',
+] as const;
+
+/** true si el nombre tiene una extensión de video conocida. */
+export function hasVideoExtension(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase().split('?')[0] ?? '';
+  return (VIDEO_EXTENSIONS as readonly string[]).includes(ext);
+}
+
+/** true si el archivo es video por MIME o por extensión (fallback Windows). */
+export function isVideoFile(name: string, type: string): boolean {
+  if (typeof type === 'string' && type.toLowerCase().startsWith('video/')) return true;
+  return hasVideoExtension(name);
+}
+
 /** Limpia el nombre para usarlo como objeto de storage (sin rutas ni acentos). */
 export function sanitizeFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'video';
@@ -83,9 +118,13 @@ export function validateUploadFiles(files: UploadFileInput[]): UploadValidation 
     };
   }
 
-  const videos = files.filter((f) => f.type.startsWith('video/'));
+  const videos = files.filter((f) => isVideoFile(f.name, f.type ?? ''));
   if (videos.length === 0) {
-    return { ok: false, error: 'Archivos inválidos: solo se aceptan videos', status: 400 };
+    return {
+      ok: false,
+      error: 'Archivos inválidos: solo se aceptan videos (MP4, WEBM, MOV, MKV, AVI)',
+      status: 400,
+    };
   }
 
   const oversized = videos.find((f) => f.size > MAX_FILE_BYTES);

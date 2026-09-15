@@ -13,6 +13,11 @@ interface GenerateRequest {
   tone?: string;
   /** Contexto adicional (ej: nombre del archivo subido localmente). */
   context?: string;
+  /**
+   * Fotogramas del video (data URLs base64 capturados en el navegador).
+   * Solo se usan en action='pack' para generación multimodal (visión).
+   */
+  frames?: string[];
 }
 
 interface GenerateResult {
@@ -29,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as GenerateRequest;
     const { mediaItemIds, action, platform, tone, context } = body;
+    const frames = body.frames;
 
     if (!mediaItemIds || !Array.isArray(mediaItemIds) || mediaItemIds.length === 0) {
       return NextResponse.json(
@@ -42,6 +48,21 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid action. Must be: caption, title, hashtags, rewrite, or pack' },
         { status: 400 }
       );
+    }
+
+    // Frames: máx 4 data URLs/base64 de tamaño razonable (defensa temprana;
+    // la normalización fina vive en parseFrames() del ai-service).
+    if (frames !== undefined) {
+      if (
+        !Array.isArray(frames) ||
+        frames.length > 4 ||
+        frames.some((f) => typeof f !== 'string' || f.length > 8_000_000)
+      ) {
+        return NextResponse.json(
+          { error: 'frames debe ser un array de máx 4 data URLs de imagen en base64' },
+          { status: 400 }
+        );
+      }
     }
 
     const { data: mediaItems, error: mediaError } = await db
@@ -83,13 +104,15 @@ export async function POST(request: NextRequest) {
       const textForAI = originalText || clientContext;
 
       // Pack completo (título + descripción + hashtags) en una sola llamada.
+      // Los frames (fotogramas del video) habilitan la generación multimodal:
+      // la IA ve el CONTENIDO real del video, no solo el nombre del archivo.
       if (action === 'pack') {
         const packContext =
           textForAI ||
           ((item.metadata?.original_filename as string) ?? '').trim() ||
           'video';
         const targetPlatform = platform ?? 'instagram';
-        const pack = await aiService.generatePack(packContext, targetPlatform);
+        const pack = await aiService.generatePack(packContext, targetPlatform, frames);
         results.push({ mediaId: item.id, generated: '', pack });
         continue;
       }

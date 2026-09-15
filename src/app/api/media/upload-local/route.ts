@@ -161,20 +161,21 @@ export async function POST() {
         continue;
       }
 
-      // Crear 4 publication_jobs en 'pending' (uno por destino)
+      // Crear 4 publication_jobs en 'pending' (uno por destino).
+      // NOTA: la BD solo tiene las columnas base de publication_jobs
+      // (publication_id, media_id, social_account_id, type, status, attempts,
+      // payload, created_at). provider/source_provider van dentro de payload.
       for (const provider of DESTINATIONS) {
         const { error: jobError } = await supabase.from('publication_jobs').insert({
           publication_id: publication.id,
           media_id: mediaItem.id,
           social_account_id: null,
-          provider,
-          source_provider: 'local',
-          // Columnas obligatorias del esquema base de publication_jobs.
           type: 'publish',
           status: 'pending',
           attempts: 0,
-          max_attempts: 3,
           payload: {
+            provider,
+            source_provider: 'local',
             original_filename: file.name,
             auto_created: true,
           },

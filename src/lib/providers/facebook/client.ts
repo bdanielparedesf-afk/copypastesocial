@@ -13,7 +13,9 @@ export async function getAccount(access_token: string) {
 
 export async function upload(_params: any) {
   if (process.env.MOCK_MODE === 'true') return { external_id: `mock_fb_${Date.now()}` };
-  return { external_id: 'fb_...' };
+  // Honestidad: no hay implementación real de publish a Facebook todavía.
+  // Devolver un id falso marcaría el job como completado sin publicar nada.
+  throw new Error('PUBLICACION_A_FACEBOOK_NO_IMPLEMENTADA_AUN');
 }
 
 export async function publish(params: any) { return upload(params); }

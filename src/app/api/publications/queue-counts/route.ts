@@ -7,22 +7,16 @@
  * - success: jobs en 'success' (últimas 24h)
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase';
+import { getUserIdAllowDev } from '@/lib/dev-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-
-    // Verificar autenticación
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
-    }
+    const supabase = createServerClient();
+    // Single-owner: nunca 401 (la app no tiene login propio).
+    await getUserIdAllowDev();
 
     // Contar jobs pending
     const { count: pendingCount, error: pendingError } = await supabase
@@ -32,7 +26,8 @@ export async function GET() {
 
     if (pendingError) throw pendingError;
 
-    // Contar jobs retrying
+    // Contar jobs retrying (estado no soportado por el CHECK actual de BD:
+    // siempre será 0, se mantiene por compatibilidad con la UI)
     const { count: retryingCount, error: retryingError } = await supabase
       .from('publication_jobs')
       .select('*', { count: 'exact', head: true })
@@ -40,13 +35,14 @@ export async function GET() {
 
     if (retryingError) throw retryingError;
 
-    // Contar jobs success (últimas 24h)
+    // Contar jobs completed (últimas 24h). La tabla no tiene updated_at,
+    // se usa created_at como referencia temporal.
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count: successCount, error: successError } = await supabase
       .from('publication_jobs')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'success')
-      .gte('updated_at', oneDayAgo);
+      .eq('status', 'completed')
+      .gte('created_at', oneDayAgo);
 
     if (successError) throw successError;
 

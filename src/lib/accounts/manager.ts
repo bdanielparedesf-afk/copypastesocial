@@ -254,26 +254,38 @@ export async function getAccountLimits(accountId: string): Promise<AccountLimits
 export async function checkCanPublish(accountId: string): Promise<boolean> {
   const admin = createServerClient();
 
-  const { data: token } = await admin
-    .from('provider_tokens')
-    .select('*')
-    .eq('social_account_id', accountId)
-    .eq('is_valid', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
+  // La BD remota puede no tener provider_tokens ni publish_queue (migraciones
+  // parciales). Fallback: social_accounts.is_valid + expiración; los checks
+  // opcionales (límites diarios) se saltan si sus tablas no existen.
+  const { data: account } = await admin
+    .from('social_accounts')
+    .select('is_valid, expires_at, provider')
+    .eq('id', accountId)
     .maybeSingle();
 
-  if (!token?.access_token) return false;
+  if (!account || account.is_valid !== true) return false;
 
-  const { used_today: usedToday } = await getAccountLimits(accountId);
+  let usedToday = 0;
+  try {
+    ({ used_today: usedToday } = await getAccountLimits(accountId));
+  } catch {
+    // provider_tokens / publish_queue / api_usage ausentes → no bloquear
+    usedToday = 0;
+  }
   if (usedToday >= DAILY_PUBLISH_LIMIT) return false;
 
-  // Expira <= 5 días → no publicar (falta reconnect / el cron aún no refrescó).
-  const expiringIn = toAccountWithToken(
-    { id: accountId },
-    token
-  ).expiring_in_days;
-  if (expiringIn !== null && expiringIn <= EXPIRING_TOKEN_DAYS) return false;
+  // Expira pronto (0-5 días) → no publicar (spec FASE 11: reconnect).
+  // SOLO tokens de larga vida (Meta). Los access tokens de Google duran ~1h
+  // y se renuevan con el refresh_token: bloquear aquí impediría publicar
+  // con YouTube siempre.
+  const provider = String(account.provider ?? '').toLowerCase();
+  const expiresAt = account.expires_at ? String(account.expires_at) : null;
+  if (provider !== 'youtube' && expiresAt) {
+    const diffDays = Math.ceil(
+      (new Date(expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    );
+    if (diffDays > 0 && diffDays <= EXPIRING_TOKEN_DAYS) return false;
+  }
 
   return true;
 }

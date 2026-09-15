@@ -12,8 +12,13 @@ export interface AIService {
   generateHashtags(count: number, platform: ProviderId, context?: string): Promise<string[]>;
   rewrite(text: string, tone: string): Promise<string>;
   adaptFor(platform: ProviderId, content: string): Promise<string>;
-  /** Genera título + descripción + hashtags en una sola llamada (1 request). */
-  generatePack(context: string, platform: ProviderId): Promise<AIPack>;
+  /**
+   * Genera título + descripción + hashtags en una sola llamada (1 request).
+   * `frames`: data URLs (o base64 puro) de fotogramas del video extraídos en
+   * el navegador — habilita visión multimodal para que el pack sea coherente
+   * con el CONTENIDO real del video y no solo con el nombre del archivo.
+   */
+  generatePack(context: string, platform: ProviderId, frames?: string[]): Promise<AIPack>;
 }
 
 const mockHashtags = ['#viral', '#fyp', '#trending', '#social', '#content', '#engagement', '#reels', '#shorts'];
@@ -55,8 +60,61 @@ function getMockPack(context: string, platform: ProviderId): AIPack {
   };
 }
 
-function buildPackPrompt(context: string, platform: ProviderId): string {
-  return `Genera metadatos de publicación para ${platform} a partir de este contexto de video: "${context}".\nResponde ÚNICAMENTE con JSON válido, sin markdown, sin bloques de código, sin explicaciones y sin texto fuera del JSON: {"title": "título atractivo de máx 95 caracteres", "description": "descripción optimizada para la plataforma de máx 200 caracteres", "hashtags": ["#hashtag", "8 hashtags relevantes"]}`;
+/* ------------------------------------------------------------------ */
+/* Frames multimodales (visión): el pack puede basarse en fotogramas   */
+/* reales del video para que título/desc/hashtags sean coherentes.     */
+/* ------------------------------------------------------------------ */
+
+/** Máximo de fotogramas por petición (3 capturas típicas del navegador). */
+const MAX_PACK_FRAMES = 4;
+/** Tope defensivo por frame en caracteres base64 (~6 MB de imagen). */
+const MAX_FRAME_CHARS = 8_000_000;
+
+interface InlineMedia {
+  mimeType: string;
+  data: string;
+}
+
+/**
+ * Convierte un frame entrante en { mimeType, data } para las APIs.
+ * Acepta data URL (`data:image/jpeg;base64,...` — lo que produce
+ * canvas.toDataURL en el navegador) o base64 puro (se asume JPEG).
+ * Retorna null si el frame es inválido o excede el tope.
+ */
+export function parseFrame(frame: unknown): InlineMedia | null {
+  if (typeof frame !== 'string') return null;
+  const trimmed = frame.trim();
+  if (!trimmed || trimmed.length > MAX_FRAME_CHARS) return null;
+  const dataUrl = trimmed.match(
+    /^data:(image\/(?:jpeg|jpg|png|webp|heic|heif));base64,([A-Za-z0-9+/=\s]+)$/i
+  );
+  if (dataUrl) {
+    const mime = dataUrl[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : dataUrl[1].toLowerCase();
+    return { mimeType: mime, data: dataUrl[2].replace(/\s+/g, '') };
+  }
+  // Base64 puro (sin prefijo) → asumir JPEG (formato del canvas del navegador)
+  if (trimmed.length >= 100 && /^[A-Za-z0-9+/=\s]+$/.test(trimmed)) {
+    return { mimeType: 'image/jpeg', data: trimmed.replace(/\s+/g, '') };
+  }
+  return null;
+}
+
+/** Normaliza y limita la lista de frames (descarta inválidos, máx 4). */
+export function parseFrames(frames?: unknown): InlineMedia[] {
+  if (!Array.isArray(frames)) return [];
+  const out: InlineMedia[] = [];
+  for (const frame of frames.slice(0, MAX_PACK_FRAMES)) {
+    const media = parseFrame(frame);
+    if (media) out.push(media);
+  }
+  return out;
+}
+
+function buildPackPrompt(context: string, platform: ProviderId, frameCount: number): string {
+  const base = frameCount > 0
+    ? `Analiza los ${frameCount} fotogramas reales del video adjuntos (son capturas del principio, medio y final). Genera metadatos de publicación para ${platform} basados PRINCIPALMENTE en lo que se ve en esos fotogramas (objetos, personas, lugares, texto en pantalla, acción). El nombre del archivo ("${context}") es solo una pista secundaria: si los fotogramas y el nombre se contradicen, prioriza los fotogramas.`
+    : `Genera metadatos de publicación para ${platform} a partir de este contexto de video: "${context}".`;
+  return `${base}\nResponde ÚNICAMENTE con JSON válido, sin markdown, sin bloques de código, sin explicaciones y sin texto fuera del JSON: {"title": "título atractivo y ESPECÍFICO del contenido de máx 95 caracteres", "description": "descripción optimizada para la plataforma de máx 200 caracteres", "hashtags": ["#hashtag", "8 hashtags relevantes y específicos del contenido"]}`;
 }
 
 function parsePack(raw: string, context: string, platform: ProviderId): AIPack {
@@ -100,12 +158,25 @@ const GEMINI_SYSTEM =
   'Eres un copywriter experto en redes sociales. Genera contenido optimizado para engagement.';
 
 /**
+ * Errores transitorios de la API que merecen reintento (backoff corto):
+ * 429 rate-limit, 5xx de infraestructura. El 503 "high demand" de Gemini
+ * suele resolverse en segundos.
+ */
+const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
+const LLM_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Llama a Google Gemini (generativelanguage API).
  * Claves AI Studio (AIza...) y Vertex express (AQ...) funcionan con
  * el header `x-goog-api-key`. Si el modelo configurado no existe,
  * reintenta con el alias estable `gemini-flash-latest`.
+ * `media`: imágenes inline (fotogramas del video) para generación multimodal.
  */
-async function callGemini(prompt: string, maxTokens: number): Promise<string> {
+async function callGemini(prompt: string, maxTokens: number, media: InlineMedia[] = []): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not configured');
@@ -116,38 +187,49 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
 
   let lastError = '';
   for (const model of models) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: GEMINI_SYSTEM }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
-        }),
+    // Partes: primero los fotogramas (inline_data) y al final el prompt.
+    const parts: Array<Record<string, unknown>> = [
+      ...media.map((m) => ({ inline_data: { mime_type: m.mimeType, data: m.data } })),
+      { text: prompt },
+    ];
+
+    for (let attempt = 0; attempt < LLM_ATTEMPTS; attempt++) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: GEMINI_SYSTEM }] },
+            contents: [{ role: 'user', parts }],
+            generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = (await response.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+        };
+        // Filtra partes de "thinking" (thought: true) típicas de Gemini 3.x
+        const text = (data.candidates?.[0]?.content?.parts ?? [])
+          .filter((p) => p && !p.thought && typeof p.text === 'string')
+          .map((p) => p?.text ?? '')
+          .join('')
+          .trim();
+        if (text) return text;
+        lastError = `Gemini ${model}: respuesta vacía`;
+        continue;
       }
-    );
 
-    if (response.ok) {
-      const data = (await response.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
-      };
-      // Filtra partes de "thinking" (thought: true) típicas de Gemini 3.x
-      const text = (data.candidates?.[0]?.content?.parts ?? [])
-        .filter((p) => p && !p.thought && typeof p.text === 'string')
-        .map((p) => p?.text ?? '')
-        .join('')
-        .trim();
-      if (text) return text;
-      lastError = `Gemini ${model}: respuesta vacía`;
-      continue;
+      lastError = `Gemini ${model}: ${response.status} ${(await response.text()).slice(0, 180)}`;
+      // Reintento solo ante errores transitorios (429/5xx)
+      if (!TRANSIENT_STATUS.has(response.status) || attempt === LLM_ATTEMPTS - 1) break;
+      await sleep(attempt === 0 ? 1200 : 2800);
     }
-
-    lastError = `Gemini ${model}: ${response.status} ${(await response.text()).slice(0, 180)}`;
   }
 
   throw new Error(`Gemini API error: ${lastError}`);
@@ -160,23 +242,32 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
  * y ese consumo descuenta del mismo presupuesto — con límites cortos el
  * JSON de salida queda truncado.
  */
-async function callLLM(prompt: string, maxTokens = 2048): Promise<string> {
+async function callLLM(prompt: string, maxTokens = 2048, media: InlineMedia[] = []): Promise<string> {
   if (process.env.GEMINI_API_KEY) {
     try {
-      return await callGemini(prompt, maxTokens);
+      return await callGemini(prompt, maxTokens, media);
     } catch (err) {
       if (!process.env.OPENAI_API_KEY) throw err;
       console.error('[ai-service] Gemini falló, usando fallback OpenAI:', err);
     }
   }
-  return callOpenAI(prompt, maxTokens);
+  return callOpenAI(prompt, maxTokens, media);
 }
 
-async function callOpenAI(prompt: string, maxTokens = 200): Promise<string> {
+async function callOpenAI(prompt: string, maxTokens = 200, media: InlineMedia[] = []): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY not configured');
   }
+
+  // Con imágenes: contenido multimodal (gpt-4o-mini soporta visión).
+  const userContent: Array<Record<string, unknown>> = [
+    ...media.map((m) => ({
+      type: 'image_url',
+      image_url: { url: `data:${m.mimeType};base64,${m.data}` },
+    })),
+    { type: 'text', text: prompt },
+  ];
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -191,7 +282,11 @@ async function callOpenAI(prompt: string, maxTokens = 200): Promise<string> {
           role: 'system',
           content: 'Eres un copywriter experto en redes sociales. Genera contenido optimizado para engagement.',
         },
-        { role: 'user', content: prompt },
+        {
+          role: 'user',
+          // Sin imágenes conserva el formato string (compat); con imágenes, array multimodal.
+          content: media.length > 0 ? userContent : prompt,
+        },
       ],
       max_tokens: maxTokens,
       temperature: 0.7,
@@ -284,12 +379,13 @@ export function createAIService(): AIService {
       return callLLM(prompt);
     },
 
-    async generatePack(context: string, platform: ProviderId): Promise<AIPack> {
+    async generatePack(context: string, platform: ProviderId, frames?: string[]): Promise<AIPack> {
       if (useMock) {
         return getMockPack(context, platform);
       }
-      const prompt = buildPackPrompt(context, platform);
-      const raw = await callLLM(prompt, 4096);
+      const media = parseFrames(frames);
+      const prompt = buildPackPrompt(context, platform, media.length);
+      const raw = await callLLM(prompt, 4096, media);
       return parsePack(raw, context, platform);
     },
   };
