@@ -43,7 +43,7 @@ const nextConfig = {
   },
   // Experimental optimizations for Next 14
   experimental: {
-    optimizePackageImport: ['lucide-react', '@radix-ui/react-icons', 'framer-motion'],
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'framer-motion'],
   },
   // Bundle analyzer en desarrollo (solo si se instala)
   webpack: (config, { dev, isServer }) => {
