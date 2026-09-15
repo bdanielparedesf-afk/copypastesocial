@@ -30,7 +30,6 @@ interface ProcessQueueResult {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[CRON] Iniciado');
   const secret = process.env.CRON_SECRET;
 
   // En producción, el header x-cron-secret es obligatorio.

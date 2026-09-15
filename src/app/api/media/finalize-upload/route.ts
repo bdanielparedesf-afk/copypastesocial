@@ -113,30 +113,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Archivos inválidos' }, { status: 400 });
     }
 
-    // source (provider='local')
-    const { data: source, error: sourceError } = await supabase
-      .from('sources')
-      .insert({
+    // source FASE 24 (provider='local' + columnas FASE 24 en sources).
+    // Fallback: si la DB aún no tiene raw_path/file_size/storage_released
+    // (error 42703/PGRST204), reintenta el insert mínimo compatible.
+    let source: { id: string } | null = null;
+    {
+      const base = {
         user_id: userId,
         original_url: `local://${confirmed[0].name}`,
         provider: 'local',
         identifier: `local_${Date.now()}`,
         content_type: 'video',
         status: 'ACCESSIBLE',
-      })
-      .select()
-      .single();
-
-    if (sourceError || !source) {
-      return NextResponse.json(
-        {
-          error: `Error al crear source: ${buildDbErrorHint(
-            sourceError?.code,
-            sourceError?.message
-          )}`,
-        },
-        { status: 500 }
-      );
+      };
+      const full = {
+        ...base,
+        raw_path: confirmed[0].path,
+        processed_path: null,
+        file_size: confirmed[0].size,
+        storage_released: false,
+      };
+      const first = await supabase.from('sources').insert(full).select().single();
+      if (!first.error && first.data) {
+        source = first.data;
+      } else if (first.error && (first.error.code === '42703' || first.error.code === 'PGRST204')) {
+        const retry = await supabase.from('sources').insert(base).select().single();
+        if (!retry.error && retry.data) {
+          source = retry.data;
+        } else {
+          return NextResponse.json(
+            {
+              error: `Error al crear source: ${buildDbErrorHint(
+                retry.error?.code,
+                retry.error?.message
+              )}`,
+            },
+            { status: 500 }
+          );
+        }
+      } else {
+        const sourceError = first.error;
+        return NextResponse.json(
+          {
+            error: `Error al crear source: ${buildDbErrorHint(
+              sourceError?.code,
+              sourceError?.message
+            )}`,
+          },
+          { status: 500 }
+        );
+      }
+    }
+    if (!source) {
+      return NextResponse.json({ error: 'Error al crear source: sin datos' }, { status: 500 });
     }
 
     // publication base

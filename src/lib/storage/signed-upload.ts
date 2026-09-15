@@ -190,8 +190,10 @@ export const REQUIRED_MIGRATIONS = [
   '20240110000000_phase21_direct_upload.sql',
 ] as const;
 
-/** Columnas imprescindibles para persistir un upload local. */
+/** Columnas imprescindibles para persistir un upload local (FASE 24: incluye sources). */
 export const REQUIRED_COLUMNS = [
+  { table: 'sources', column: 'raw_path' },
+  { table: 'sources', column: 'storage_released' },
   { table: 'media_items', column: 'raw_path' },
   { table: 'media_items', column: 'source_provider' },
   { table: 'publication_jobs', column: 'media_id' },

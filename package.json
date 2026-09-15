@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "test:e2e:upload": "vitest run src/app/api/media/finalize-upload/finalize-upload.e2e.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
